@@ -1,0 +1,4 @@
+model:
+  name: arima
+  order: [1, 1, 1]
+  max_stores: 50

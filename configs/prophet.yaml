@@ -1,0 +1,6 @@
+model:
+  name: prophet
+  changepoint_prior_scale: 0.05
+  seasonality_mode: multiplicative
+  regressors: [Promo]
+  max_stores: 50

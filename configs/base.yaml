@@ -1,0 +1,23 @@
+data:
+  raw_dir: data/raw
+  cleaned_dir: data/cleaned
+  train_file: train.csv
+  store_file: store.csv
+  test_file: test.csv
+  use_cleaned: false
+
+split:
+  train_end: "2015-01-31"
+  val_start: "2015-02-01"
+  val_end: "2015-05-31"
+  test_start: "2015-06-01"
+
+seed: 42
+
+max_stores: null  # set to int (e.g. 50) for dev, null for full run
+
+metrics:
+  primary: rmspe
+  secondary: [rmse, mae, mape]
+
+results_dir: results

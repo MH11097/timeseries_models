@@ -1,0 +1,9 @@
+model:
+  name: lstm
+  hidden_size: 128
+  num_layers: 2
+  seq_len: 30
+  batch_size: 256
+  epochs: 50
+  learning_rate: 0.001
+  dropout: 0.2

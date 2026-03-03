@@ -1,0 +1,6 @@
+model:
+  name: sarimax
+  order: [1, 1, 1]
+  seasonal_order: [1, 1, 1, 7]
+  exog_columns: [Promo, SchoolHoliday]
+  max_stores: 50
