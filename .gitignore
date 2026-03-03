@@ -1,5 +1,4 @@
 # Data — giữ data/ trên git để share, chỉ ignore raw data nặng
-data/raw/
 results/
 
 # Python
