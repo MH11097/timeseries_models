@@ -6,7 +6,7 @@ from pathlib import Path
 import typer
 
 from src.data.features import add_all_features
-from src.data.loader import load_raw_data, sample_stores
+from src.data.loader import load_cleaned_data, load_raw_data, sample_stores
 from src.data.preprocessor import preprocess
 from src.evaluation.cross_validation import walk_forward_cv
 from src.models import get_model_class
@@ -14,6 +14,7 @@ from src.models.base import BaseModel
 from src.utils.config import load_config
 from src.utils.seed import set_seed
 from src.utils.visualization import plot_predictions, plot_residuals
+from scripts.train import _parse_overrides
 
 app = typer.Typer(help="Evaluate trained forecasting models.")
 
@@ -21,18 +22,27 @@ app = typer.Typer(help="Evaluate trained forecasting models.")
 @app.command()
 def evaluate(
     model: str = typer.Option(..., "--model", "-m", help="Model name"),
+    set_values: list[str] = typer.Option(
+        None, "--set", "-s", help="Override config key=value"
+    ),
     run_dir: str = typer.Option(None, "--run-dir", help="Path to saved run directory"),
     cv: str = typer.Option(None, "--cv", help="CV strategy: 'expanding' or 'sliding'"),
     n_splits: int = typer.Option(5, "--n-splits", help="Number of CV folds"),
 ):
     """Evaluate a model on validation/test data or run cross-validation."""
-    config = load_config(model)
+    overrides = _parse_overrides(set_values)
+    config = load_config(model, overrides)
     set_seed(config.get("seed", 42))
 
     if cv:
         # walk-forward CV mô phỏng thực tế: train trên quá khứ, test trên tương lai gần
         typer.echo(f"Running {cv} walk-forward CV with {n_splits} splits...")
-        df, _ = load_raw_data(config)
+        use_cleaned = config.get("data", {}).get("use_cleaned", False)
+        if use_cleaned:
+            typer.echo("Using pre-cleaned data...")
+            df, _ = load_cleaned_data(config)
+        else:
+            df, _ = load_raw_data(config)
         df = sample_stores(df, config)
         df = add_all_features(df)
 
@@ -74,7 +84,12 @@ def evaluate(
     loaded_model = BaseModel.load(str(model_path))
 
     # Load and preprocess data
-    df, _ = load_raw_data(config)
+    use_cleaned = config.get("data", {}).get("use_cleaned", False)
+    if use_cleaned:
+        typer.echo("Using pre-cleaned data...")
+        df, _ = load_cleaned_data(config)
+    else:
+        df, _ = load_raw_data(config)
     df = sample_stores(df, config)
     df = add_all_features(df)
     _, val_df, test_df, _ = preprocess(df, config)
@@ -89,12 +104,14 @@ def evaluate(
         # Save plots
         preds = loaded_model.predict(split_df)
         plot_predictions(
-            split_df["Sales"].values, preds,
+            split_df["Sales"].values,
+            preds,
             title=f"{model} - {split_name}",
             save_path=f"{run_dir}/{split_name}_predictions.png",
         )
         plot_residuals(
-            split_df["Sales"].values, preds,
+            split_df["Sales"].values,
+            preds,
             title=f"{model} - {split_name}",
             save_path=f"{run_dir}/{split_name}_residuals.png",
         )

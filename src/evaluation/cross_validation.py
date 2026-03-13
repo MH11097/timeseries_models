@@ -5,6 +5,13 @@ import time
 import numpy as np
 import pandas as pd
 
+from src.data.preprocessor import (
+    _encode_categoricals,
+    _get_numeric_feature_cols,
+    _handle_missing_values,
+)
+from sklearn.preprocessing import StandardScaler
+
 
 def walk_forward_cv(
     model_class,
@@ -55,6 +62,21 @@ def walk_forward_cv(
         train_df = df[df["Date"].isin(train_dates)].copy()
         test_df = df[df["Date"].isin(test_dates)].copy()
 
+        # Apply preprocessing per-fold to avoid data leakage:
+        # - Handle missing values and encode categoricals for both train and test
+        # - Fit scaler only on train_df, then transform both sets
+        train_df = _handle_missing_values(train_df)
+        test_df = _handle_missing_values(test_df)
+        train_df = _encode_categoricals(train_df)
+        test_df = _encode_categoricals(test_df)
+
+        # Scale features: fit scaler on train, apply to test
+        numeric_cols = _get_numeric_feature_cols(train_df)
+        if numeric_cols:
+            scaler = StandardScaler()
+            train_df[numeric_cols] = scaler.fit_transform(train_df[numeric_cols])
+            test_df[numeric_cols] = scaler.transform(test_df[numeric_cols])
+
         model = model_class(config)
         start = time.time()
         model.train(train_df)
@@ -76,4 +98,8 @@ def walk_forward_cv(
             aggregated[f"{key}_mean"] = round(float(np.mean(values)), 6)
             aggregated[f"{key}_std"] = round(float(np.std(values)), 6)
 
-    return {"folds": fold_metrics, "aggregated": aggregated, "n_splits": len(fold_metrics)}
+    return {
+        "folds": fold_metrics,
+        "aggregated": aggregated,
+        "n_splits": len(fold_metrics),
+    }
