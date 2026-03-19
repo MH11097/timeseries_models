@@ -1,4 +1,4 @@
-"""Randomized search for XGBoost hyperparameter optimization with time series validation."""
+"""Grid search for XGBoost models with specific hyperparameter ranges."""
 
 import json
 import time
@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import typer
 import xgboost as xgb
-from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit
+from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 
 from src.data.features import add_all_features
 from src.data.loader import load_cleaned_data, load_raw_data, sample_stores
@@ -17,7 +17,7 @@ from src.evaluation.metrics import rmspe
 from src.utils.config import load_config
 from src.utils.seed import set_seed
 
-app = typer.Typer(help="RandomizedSearchCV for XGBoost hyperparameter tuning.")
+app = typer.Typer(help="GridSearchCV for XGBoost models with custom parameter ranges.")
 
 # Features for XGBoost model
 FEATURE_COLS = [
@@ -56,28 +56,31 @@ def get_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 @app.command()
-def randomized_search(
+def grid_search(
     model_name: str = "xgboost",
     use_cleaned: bool = True,
     cv_splits: int = 5,
     n_jobs: int = -1,
-    quick: bool = False,
-    n_iter: int | None = None,
     max_stores: int | None = None,
 ):
     """
-    Run RandomizedSearchCV for XGBoost.
+    Run GridSearchCV for XGBoost models with custom parameters.
+
+    Parameters:
+        - max_depth: [9, 11]
+        - learning_rate: [0.01, 0.05]
+        - n_estimators: [300, 500]
+        - subsample: [1.0] (fixed)
+        - colsample_bytree: [1.0] (fixed)
 
     Args:
         model_name: Model name (default: xgboost)
         use_cleaned: Use pre-cleaned data (default: True)
         cv_splits: Number of cross-validation splits (default: 5)
         n_jobs: Number of parallel jobs (-1 = all cores, default: -1)
-        quick: Quick search with fewer parameter combinations (default: False)
-        n_iter: Number of random combinations to try (default: auto-determined)
         max_stores: Limit number of stores for faster testing (default: None)
     """
-    typer.echo("=== RandomizedSearchCV for XGBoost ===")
+    typer.echo("=== GridSearchCV for XGBoost Models ===")
 
     # Load configuration and data
     config = load_config(model_name)
@@ -107,34 +110,24 @@ def randomized_search(
     typer.echo(f"Data shape: X={X.shape}, y={y.shape}")
 
     # Define parameter grid
-    if quick:
-        param_grid = {
-            "max_depth": [5, 7, 9],
-            "learning_rate": [0.05, 0.1, 0.2],
-            "n_estimators": [500, 1000, 1500],
-            "subsample": [0.8, 1.0],
-            "colsample_bytree": [0.8, 1.0],
-            "reg_alpha": [0, 0.5],
-            "reg_lambda": [1.0, 1.5],
-        }
-        # Auto-determine n_iter if not provided
-        if n_iter is None:
-            n_iter = 20  # Quick: test 20 random combinations
-        typer.echo(f"Quick search: {n_iter} random combinations")
-    else:
-        param_grid = {
-            "max_depth": [5, 7, 9, 11],
-            "learning_rate": [0.01, 0.05, 0.1, 0.2],
-            "n_estimators": [500, 1000, 1500],
-            "subsample": [0.6, 0.8, 1.0],
-            "colsample_bytree": [0.6, 0.8, 1.0],
-            "reg_alpha": [0, 1.0],
-            "reg_lambda": [0.5, 2.0],
-        }
-        # Auto-determine n_iter if not provided
-        if n_iter is None:
-            n_iter = 50  # Full: test 50 random combinations
-        typer.echo(f"Full search: {n_iter} random combinations")
+    param_grid = {
+        "max_depth": [9, 11],
+        "learning_rate": [0.01, 0.05],
+        "n_estimators": [300, 500],
+        "subsample": [1.0],
+        "colsample_bytree": [1.0],
+        "reg_alpha": [0, 0.5],
+        "reg_lambda": [1.0, 1.5],
+    }
+
+    # Calculate total parameter combinations
+    n_combos = 1
+    for v in param_grid.values():
+        n_combos *= len(v)
+
+    typer.echo(f"\nParameter Grid:")
+    for param, values in param_grid.items():
+        typer.echo(f"  {param}: {values}")
 
     # Create base model
     base_model = xgb.XGBRegressor(random_state=seed, n_jobs=1)
@@ -152,61 +145,50 @@ def randomized_search(
     ts_cv = TimeSeriesSplit(n_splits=cv_splits)
 
     typer.echo("\n" + "=" * 80)
-    typer.echo("TIME SERIES RANDOMIZEDSEARCHCV (Walk-Forward Validation)")
+    typer.echo("TIME SERIES GRIDSEARCHCV (Walk-Forward Validation)")
     typer.echo("=" * 80)
 
-    # Calculate total parameter combinations (for reference)
-    total_combos = 1
-    for v in param_grid.values():
-        total_combos *= len(v)
-    typer.echo(f"Total possible combinations: {total_combos}")
-    typer.echo(f"Testing with n_iter: {n_iter} random combinations")
+    typer.echo(f"Total parameter combinations: {n_combos}")
     typer.echo(f"CV splits (TimeSeriesSplit): {cv_splits}")
-    typer.echo(f"Total model evaluations: {n_iter * cv_splits}\n")
+    typer.echo(f"Total model evaluations: {n_combos * cv_splits}\n")
 
-    # Run RandomizedSearchCV with time series split
-    typer.echo(f"Running RandomizedSearchCV with TimeSeriesSplit...")
+    # Run GridSearchCV with time series split
+    typer.echo(f"Running GridSearchCV with TimeSeriesSplit...")
     start_time = time.time()
 
-    random_search_cv = RandomizedSearchCV(
+    grid_search_cv = GridSearchCV(
         estimator=base_model,
-        param_distributions=param_grid,
-        n_iter=n_iter,  # Number of random combinations to try
+        param_grid=param_grid,
         cv=ts_cv,  # Time series split instead of random K-fold
         scoring=rmspe_scorer,
         n_jobs=n_jobs,
-        random_state=seed,  # For reproducibility
         verbose=2,  # Verbose output to see progress
     )
 
-    random_search_cv.fit(X, y)
+    grid_search_cv.fit(X, y)
     elapsed = time.time() - start_time
 
     # Results
     typer.echo(f"\n" + "=" * 80)
-    typer.echo(
-        f"RandomizedSearchCV completed in {elapsed:.1f}s ({elapsed/60:.1f} minutes)"
-    )
-    typer.echo(f"Best score (RMSPE): {-random_search_cv.best_score_:.4f}")
-    typer.echo(
-        f"Best parameters:\n{json.dumps(random_search_cv.best_params_, indent=2)}"
-    )
+    typer.echo(f"GridSearchCV completed in {elapsed:.1f}s ({elapsed/60:.1f} minutes)")
+    typer.echo(f"Best score (RMSPE): {-grid_search_cv.best_score_:.4f}")
+    typer.echo(f"Best parameters:\n{json.dumps(grid_search_cv.best_params_, indent=2)}")
     typer.echo("=" * 80)
 
     # Save detailed results
     results_dir = (
-        Path(config.get("results_dir", "results")) / "xgboost" / "randomized_search"
+        Path(config.get("results_dir", "results")) / "xgboost" / "grid_search_custom"
     )
     results_dir.mkdir(parents=True, exist_ok=True)
 
     # Save best parameters
     best_params_path = results_dir / "best_params.json"
     with open(best_params_path, "w") as f:
-        json.dump(random_search_cv.best_params_, f, indent=2)
+        json.dump(grid_search_cv.best_params_, f, indent=2)
     typer.echo(f"Best parameters saved to {best_params_path}")
 
     # Save CV results with run indexing
-    cv_results_df = pd.DataFrame(random_search_cv.cv_results_)
+    cv_results_df = pd.DataFrame(grid_search_cv.cv_results_)
 
     # Add run index for each parameter combination
     cv_results_df.insert(0, "run_index", range(1, len(cv_results_df) + 1))
@@ -241,16 +223,14 @@ def randomized_search(
     # Display all runs with index in console
     typer.echo(f"\nAll {len(all_runs_log)} runs (indexed):")
     typer.echo("-" * 100)
-    for run in all_runs_log[: min(20, len(all_runs_log))]:  # Show first 20
+    for run in all_runs_log:
         typer.echo(
             f"[Run {run['run_index']}] RMSPE: {run['mean_test_score']:.4f} | Params: {run['params']}"
         )
-    if len(all_runs_log) > 20:
-        typer.echo(f"... ({len(all_runs_log) - 20} more runs)")
     typer.echo("-" * 100)
 
     # Top 10 results
-    top_10_idx = np.argsort(random_search_cv.cv_results_["rank_test_score"])[:10]
+    top_10_idx = np.argsort(grid_search_cv.cv_results_["rank_test_score"])[:10]
     top_10 = cv_results_df.iloc[top_10_idx][
         [
             "run_index",
@@ -276,9 +256,9 @@ def randomized_search(
 
     # Summary
     summary = {
-        "total_combinations": len(random_search_cv.cv_results_["params"]),
-        "best_rmspe": float(-random_search_cv.best_score_),
-        "best_params": random_search_cv.best_params_,
+        "total_combinations": len(grid_search_cv.cv_results_["params"]),
+        "best_rmspe": float(-grid_search_cv.best_score_),
+        "best_params": grid_search_cv.best_params_,
         "cv_splits": cv_splits,
         "training_time_seconds": elapsed,
         "data_shape": {"n_samples": X.shape[0], "n_features": X.shape[1]},
