@@ -13,7 +13,7 @@ from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit
 from src.data.features import add_all_features
 from src.data.loader import load_cleaned_data, load_raw_data, sample_stores
 from src.data.preprocessor import preprocess
-from src.evaluation.metrics import mape
+from src.evaluation.metrics import rmspe
 from src.utils.config import load_config
 from src.utils.seed import set_seed
 
@@ -109,11 +109,11 @@ def randomized_search(
     # Define parameter grid
     if quick:
         param_grid = {
-            "max_depth": [5, 7, 9],
-            "learning_rate": [0.05, 0.1, 0.2],
-            "n_estimators": [500, 1000, 1500],
-            "subsample": [0.8, 1.0],
-            "colsample_bytree": [0.8, 1.0],
+            "max_depth": [9, 11, 13],
+            "learning_rate": [0.01, 0.03, 0.05],
+            "n_estimators": [100, 300, 500],
+            "subsample": [1.0],
+            "colsample_bytree": [1.0],
         }
         # Auto-determine n_iter if not provided
         if n_iter is None:
@@ -135,12 +135,12 @@ def randomized_search(
     # Create base model
     base_model = xgb.XGBRegressor(random_state=seed, n_jobs=1)
 
-    # Custom scoring function using MAPE
+    # Custom scoring function using RMSPE
     # sklearn scorer signature: scorer(estimator, X_test, y_test)
-    def mape_scorer(estimator, X_test, y_test):
+    def rmspe_scorer(estimator, X_test, y_test):
         y_pred = estimator.predict(X_test)
         y_pred = np.clip(y_pred, 0, None)  # Ensure non-negative predictions
-        return -mape(
+        return -rmspe(
             y_test, y_pred
         )  # Negative because sklearn expects higher is better
 
@@ -169,7 +169,7 @@ def randomized_search(
         param_distributions=param_grid,
         n_iter=n_iter,  # Number of random combinations to try
         cv=ts_cv,  # Time series split instead of random K-fold
-        scoring=mape_scorer,
+        scoring=rmspe_scorer,
         n_jobs=n_jobs,
         random_state=seed,  # For reproducibility
         verbose=2,  # Verbose output to see progress
@@ -183,7 +183,7 @@ def randomized_search(
     typer.echo(
         f"RandomizedSearchCV completed in {elapsed:.1f}s ({elapsed/60:.1f} minutes)"
     )
-    typer.echo(f"Best score (MAPE): {-random_search_cv.best_score_:.4f}")
+    typer.echo(f"Best score (RMSPE): {-random_search_cv.best_score_:.4f}")
     typer.echo(
         f"Best parameters:\n{json.dumps(random_search_cv.best_params_, indent=2)}"
     )
@@ -219,9 +219,9 @@ def randomized_search(
             "mean_test_score",
         ]
     ].copy()
-    top_10["mean_test_score"] = -top_10["mean_test_score"]  # Convert back to MAPE
+    top_10["mean_test_score"] = -top_10["mean_test_score"]  # Convert back to RMSPE
 
-    typer.echo("\nTop 10 parameter combinations (by MAPE):")
+    typer.echo("\nTop 10 parameter combinations (by RMSPE):")
     typer.echo(top_10.to_string())
 
     top_10_path = results_dir / "top_10_params.csv"
@@ -231,7 +231,7 @@ def randomized_search(
     # Summary
     summary = {
         "total_combinations": len(random_search_cv.cv_results_["params"]),
-        "best_mape": float(-random_search_cv.best_score_),
+        "best_rmspe": float(-random_search_cv.best_score_),
         "best_params": random_search_cv.best_params_,
         "cv_splits": cv_splits,
         "training_time_seconds": elapsed,
