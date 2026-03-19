@@ -28,6 +28,9 @@ def evaluate(
     run_dir: str = typer.Option(None, "--run-dir", help="Path to saved run directory"),
     cv: str = typer.Option(None, "--cv", help="CV strategy: 'expanding' or 'sliding'"),
     n_splits: int = typer.Option(5, "--n-splits", help="Number of CV folds"),
+    eval_days: int = typer.Option(
+        None, "--eval-days", help="Limit evaluation to first N days"
+    ),
 ):
     """Evaluate a model on validation/test data or run cross-validation."""
     overrides = _parse_overrides(set_values)
@@ -98,19 +101,26 @@ def evaluate(
     for split_name, split_df in [("validation", val_df), ("test", test_df)]:
         if len(split_df) == 0:
             continue
-        metrics = loaded_model.evaluate(split_df)
+
+        # Limit to specified number of days if eval_days is provided
+        if eval_days is not None:
+            eval_df = split_df.head(eval_days)
+            typer.echo(f"Evaluating on first {eval_days} days ({len(eval_df)} samples)")
+        else:
+            eval_df = split_df
+        metrics = loaded_model.evaluate(eval_df)
         typer.echo(f"{split_name.capitalize()} metrics: {metrics}")
 
         # Save plots
-        preds = loaded_model.predict(split_df)
+        preds = loaded_model.predict(eval_df)
         plot_predictions(
-            split_df["Sales"].values,
+            eval_df["Sales"].values,
             preds,
             title=f"{model} - {split_name}",
             save_path=f"{run_dir}/{split_name}_predictions.png",
         )
         plot_residuals(
-            split_df["Sales"].values,
+            eval_df["Sales"].values,
             preds,
             title=f"{model} - {split_name}",
             save_path=f"{run_dir}/{split_name}_residuals.png",

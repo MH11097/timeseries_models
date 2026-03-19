@@ -1,8 +1,8 @@
 model:
   name: xgboost
-  n_estimators: 1000
-  max_depth: 7
-  learning_rate: 0.1
-  subsample: 0.8
-  colsample_bytree: 0.8
+  n_estimators: 500
+  max_depth: 9
+  learning_rate: 0.03
+  subsample: 1
+  colsample_bytree: 1
   early_stopping_rounds: 50
