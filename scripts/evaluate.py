@@ -29,7 +29,7 @@ def evaluate(
     cv: str = typer.Option(None, "--cv", help="CV strategy: 'expanding' or 'sliding'"),
     n_splits: int = typer.Option(5, "--n-splits", help="Number of CV folds"),
     eval_days: int = typer.Option(
-        None, "--eval-days", help="Limit evaluation to first N days"
+        30, "--eval-days", help="Limit evaluation to first N days (default: 30)"
     ),
 ):
     """Evaluate a model on validation/test data or run cross-validation."""
@@ -51,7 +51,12 @@ def evaluate(
 
         model_class = get_model_class(model)
         cv_results = walk_forward_cv(
-            model_class, config, df, n_splits=n_splits, expanding=(cv == "expanding")
+            model_class,
+            config,
+            df,
+            n_splits=n_splits,
+            expanding=(cv == "expanding"),
+            eval_days=eval_days,
         )
         typer.echo(f"CV Results ({n_splits} folds):")
         for fold in cv_results["folds"]:

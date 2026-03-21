@@ -19,6 +19,7 @@ def walk_forward_cv(
     df: pd.DataFrame,
     n_splits: int = 5,
     expanding: bool = True,
+    eval_days: int = 30,
 ) -> dict:
     """Walk-forward expanding/sliding window cross-validation.
 
@@ -28,6 +29,7 @@ def walk_forward_cv(
         df: Full DataFrame sorted by Date
         n_splits: Number of CV folds
         expanding: If True, expanding window; else sliding window
+        eval_days: Limit evaluation to first N days of each test fold (default: 30)
 
     Returns:
         Dict with per-fold metrics and aggregated mean/std
@@ -61,6 +63,10 @@ def walk_forward_cv(
 
         train_df = df[df["Date"].isin(train_dates)].copy()
         test_df = df[df["Date"].isin(test_dates)].copy()
+
+        # Limit test fold to first eval_days days to ensure consistent evaluation period
+        if eval_days is not None and eval_days > 0:
+            test_df = test_df.head(eval_days)
 
         # Apply preprocessing per-fold to avoid data leakage:
         # - Handle missing values and encode categoricals for both train and test
