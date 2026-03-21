@@ -9,6 +9,7 @@ def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
     # Date chỉ là 1 cột -> tách thành nhiều feature thời gian để model bắt pattern theo mùa/tuần/ngày
     df["Year"] = df["Date"].dt.year
     df["Month"] = df["Date"].dt.month
+    df["Quarter"] = df["Date"].dt.quarter
     df["WeekOfYear"] = df["Date"].dt.isocalendar().week.astype(int)
     df["DayOfMonth"] = df["Date"].dt.day
     df["DayOfWeek"] = df["Date"].dt.dayofweek
@@ -20,26 +21,35 @@ def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
 def add_lag_features(df: pd.DataFrame, lags: list[int] | None = None) -> pd.DataFrame:
     """Add lagged Sales features per store."""
     if lags is None:
-        lags = [1, 7, 14, 30]
+        lags = [1, 7, 14, 30, 92, 365]  # 92 ≈ last quarter, 365 = last year
     df = df.copy()
     # sales hôm nay phụ thuộc sales quá khứ -> shift theo từng store để tránh data leakage giữa store
-    # lag 1,7 bắt trend ngắn hạn; lag 14,30 bắt trend trung hạn
+    # lag 1,7 bắt trend ngắn hạn; lag 14,30 bắt trend trung hạn; lag 92,365 bắt seasonal pattern
     for lag in lags:
         df[f"Sales_lag_{lag}"] = df.groupby("Store")["Sales"].shift(lag)
     return df
 
 
-def add_rolling_features(df: pd.DataFrame, windows: list[int] | None = None) -> pd.DataFrame:
-    """Add rolling mean/std of Sales per store."""
+def add_rolling_features(
+    df: pd.DataFrame, windows: list[int] | None = None
+) -> pd.DataFrame:
+    """Add rolling mean/std/median of Sales per store."""
     if windows is None:
-        windows = [7, 14, 30]
+        windows = [7, 14, 30, 92, 365]  # 92 ≈ previous quarter, 365 = previous year
     df = df.copy()
-    # lag feature chỉ là 1 điểm -> rolling mean/std cho xu hướng trung bình và mức biến động gần đây
+    # lag feature chỉ là 1 điểm -> rolling mean/std/median cho xu hướng trung bình, mức biến động, và xu hướng trung vị gần đây
     # shift(1) trước khi rolling để tránh data leakage (không dùng sales hôm nay để dự đoán hôm nay)
     for w in windows:
         grouped = df.groupby("Store")["Sales"]
-        df[f"Sales_rolling_mean_{w}"] = grouped.transform(lambda x: x.shift(1).rolling(w, min_periods=1).mean())
-        df[f"Sales_rolling_std_{w}"] = grouped.transform(lambda x: x.shift(1).rolling(w, min_periods=1).std())
+        df[f"Sales_rolling_mean_{w}"] = grouped.transform(
+            lambda x: x.shift(1).rolling(w, min_periods=1).mean()
+        )
+        df[f"Sales_rolling_std_{w}"] = grouped.transform(
+            lambda x: x.shift(1).rolling(w, min_periods=1).std()
+        )
+        df[f"Sales_rolling_median_{w}"] = grouped.transform(
+            lambda x: x.shift(1).rolling(w, min_periods=1).median()
+        )
     return df
 
 
@@ -48,10 +58,12 @@ def add_competition_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     # đối thủ mở càng lâu thì ảnh hưởng lên sales càng ổn định -> tính số tháng kể từ khi mở
     # âm hoặc NaN = chưa có đối thủ -> clip về 0
-    df["CompetitionOpenMonths"] = (
-        (df["Year"] - df["CompetitionOpenSinceYear"]) * 12 + (df["Month"] - df["CompetitionOpenSinceMonth"])
+    df["CompetitionOpenMonths"] = (df["Year"] - df["CompetitionOpenSinceYear"]) * 12 + (
+        df["Month"] - df["CompetitionOpenSinceMonth"]
     )
-    df["CompetitionOpenMonths"] = df["CompetitionOpenMonths"].clip(lower=0).fillna(0).astype(int)
+    df["CompetitionOpenMonths"] = (
+        df["CompetitionOpenMonths"].clip(lower=0).fillna(0).astype(int)
+    )
     return df
 
 
@@ -60,9 +72,18 @@ def add_promo2_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     # PromoInterval chứa tên tháng viết tắt (Jan,Apr,...) -> ánh xạ số tháng sang tên để so sánh
     month_map = {
-        1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr",
-        5: "May", 6: "Jun", 7: "Jul", 8: "Aug",
-        9: "Sept", 10: "Oct", 11: "Nov", 12: "Dec",
+        1: "Jan",
+        2: "Feb",
+        3: "Mar",
+        4: "Apr",
+        5: "May",
+        6: "Jun",
+        7: "Jul",
+        8: "Aug",
+        9: "Sept",
+        10: "Oct",
+        11: "Nov",
+        12: "Dec",
     }
 
     def _is_promo2_active(row):

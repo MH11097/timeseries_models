@@ -111,13 +111,13 @@ def grid_search(
 
     # Define parameter grid
     param_grid = {
-        "max_depth": [9, 12],
-        "learning_rate": [0.05, 0.1],
-        "n_estimators": [500, 800],
-        "subsample": [0.9, 1.0],
-        "colsample_bytree": [0.7, 0.8],
-        "reg_alpha": [0.5, 1.5],
-        "reg_lambda": [1.5, 2.5],
+        "max_depth": [9],
+        "learning_rate": [0.03, 0.05],
+        "n_estimators": [800, 1000],
+        "subsample": [1.0],
+        "colsample_bytree": [0.8],
+        "reg_alpha": [1.5, 2],
+        "reg_lambda": [2.5, 3],
     }
 
     # Calculate total parameter combinations
