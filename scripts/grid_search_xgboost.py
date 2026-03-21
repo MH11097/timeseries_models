@@ -111,13 +111,13 @@ def grid_search(
 
     # Define parameter grid
     param_grid = {
-        "max_depth": [7, 9, 11],
-        "learning_rate": [0.01, 0.05, 0.1],
-        "n_estimators": [300, 500, 1000],
+        "max_depth": [7, 9],
+        "learning_rate": [0.01, 0.05],
+        "n_estimators": [300, 500],
         "subsample": [0.8, 1.0],
         "colsample_bytree": [0.8, 1.0],
-        "reg_alpha": [0, 0.5, 1.5],
-        "reg_lambda": [1.0, 1.5, 3],
+        "reg_alpha": [0, 0.5],
+        "reg_lambda": [1.0, 1.5],
     }
 
     # Calculate total parameter combinations
@@ -209,7 +209,6 @@ def grid_search(
             },
             "mean_test_score": float(-row["mean_test_score"]),  # Convert back to RMSPE
             "std_test_score": float(row["std_test_score"]),
-            "mean_train_score": float(-row["mean_train_score"]),
             "rank_test_score": int(row["rank_test_score"]),
         }
         all_runs_log.append(run_entry)
