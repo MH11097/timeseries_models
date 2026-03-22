@@ -19,7 +19,7 @@ def walk_forward_cv(
     df: pd.DataFrame,
     n_splits: int = 5,
     expanding: bool = True,
-    eval_days: int = 30,
+    eval_days: int = None,
 ) -> dict:
     """Walk-forward expanding/sliding window cross-validation.
 
@@ -29,7 +29,7 @@ def walk_forward_cv(
         df: Full DataFrame sorted by Date
         n_splits: Number of CV folds
         expanding: If True, expanding window; else sliding window
-        eval_days: Limit evaluation to first N days of each test fold (default: 30)
+        eval_days: Limit evaluation to first N days of each test fold (default: None)
 
     Returns:
         Dict with per-fold metrics and aggregated mean/std
