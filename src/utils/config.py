@@ -39,14 +39,21 @@ def load_config(model_name: str | None = None, overrides: dict | None = None) ->
     """
     # base.yaml chứa config chung (seed, split dates, data paths) -> nền tảng cho mọi model
     base_path = CONFIGS_DIR / "base.yaml"
-    with open(base_path) as f:
+    with open(base_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
+
+    # features.yaml chứa cấu hình bật/tắt từng nhóm feature -> merge vào config chung
+    features_path = CONFIGS_DIR / "features.yaml"
+    if features_path.exists():
+        with open(features_path, encoding="utf-8") as f:
+            features_config = yaml.safe_load(f) or {}
+        config = _deep_merge(config, features_config)
 
     # model-specific yaml (arima.yaml, xgboost.yaml...) ghi đè hyperparams riêng
     if model_name:
         model_path = CONFIGS_DIR / f"{model_name}.yaml"
         if model_path.exists():
-            with open(model_path) as f:
+            with open(model_path, encoding="utf-8") as f:
                 model_config = yaml.safe_load(f) or {}
             config = _deep_merge(config, model_config)
 

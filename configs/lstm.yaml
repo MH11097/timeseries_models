@@ -1,9 +1,41 @@
+# ============================================================
+# LSTM — Default configuration
+# Best config từ grid search (recursive H=30, val RMSPE ~0.26)
+# ============================================================
+
+# --- Target transform ---
+# log1p(Sales) → MSE trên log ≈ tối ưu RMSPE gián tiếp, gradient ổn định
+use_log_sales: true
+
+# --- Forecast strategy ---
+# recursive và multioutput cho H=30:
+#   - nhiều training samples hơn (+29 windows/store)
+#   - single target → gradient sạch hơn
+#   - exogenous features (Promo, DayOfWeek) đã biết trước → giảm error accumulation
+forecast_strategy: "multioutput"
+
+# --- Loss function ---
+# mse trên log-space ≈ rmspe
+loss_fn: "mse"
+
 model:
   name: lstm
-  hidden_size: 128
-  num_layers: 2
-  seq_len: 30
-  batch_size: 256
-  epochs: 50
-  learning_rate: 0.001
-  dropout: 0.2
+
+  # --- Architecture ---
+  hidden_size: 64      
+  num_layers: 1        
+  seq_len: 21          
+
+  # --- Training ---
+  batch_size: 256      
+  epochs: 100          
+  learning_rate: 0.0005 
+  dropout: 0.2         
+  weight_decay: 0.0    # L2 regularization. Thử 1e-5 → 1e-3 nếu val_loss > train_loss nhiều
+
+  # --- Forecast ---
+  forecast_horizon: 30 # H = số ngày dự báo vào tương lai
+
+  # --- Early stopping ---
+  patience: 15         # dừng sau 15 epoch liên tiếp không cải thiện
+  min_delta: 0.0001    # cải thiện < 0.0001 coi như "không đổi"

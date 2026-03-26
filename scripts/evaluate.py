@@ -1,14 +1,16 @@
 """CLI script for evaluating trained models."""
 
 import json
+import numpy as np
 from pathlib import Path
 
 import typer
 
-from src.data.features import add_all_features
+from src.data.features import add_all_features, apply_log_transform
 from src.data.loader import load_raw_data, sample_stores
 from src.data.preprocessor import preprocess
 from src.evaluation.cross_validation import walk_forward_cv
+from src.evaluation.metrics import evaluate_all
 from src.models import get_model_class
 from src.models.base import BaseModel
 from src.utils.config import load_config
@@ -34,7 +36,9 @@ def evaluate(
         typer.echo(f"Running {cv} walk-forward CV with {n_splits} splits...")
         df, _ = load_raw_data(config)
         df = sample_stores(df, config)
-        df = add_all_features(df)
+        df = add_all_features(df, feature_cfg=config.get("features", {}))
+        if config.get("use_log_sales", False):
+            df = apply_log_transform(df)
 
         model_class = get_model_class(model)
         cv_results = walk_forward_cv(
@@ -76,25 +80,56 @@ def evaluate(
     # Load and preprocess data
     df, _ = load_raw_data(config)
     df = sample_stores(df, config)
-    df = add_all_features(df)
-    _, val_df, test_df, _ = preprocess(df, config)
+    df = add_all_features(df, feature_cfg=config.get("features", {}))
+    if config.get("use_log_sales", False):
+        typer.echo("Applying log1p transform to Sales and derived features...")
+        df = apply_log_transform(df)
+    train_df, val_df, test_df, _ = preprocess(df, config)
+
+    use_log = config.get("use_log_sales", False)
+
+    def _get_true_sales(split_df):
+        """Trả về Sales gốc (inverse log nếu cần) để tính metrics đúng scale."""
+        sales = split_df["Sales"].values.astype(float)
+        return np.expm1(sales) if use_log else sales
+
+    # Prepend context (seq_len + H - 1 rows) để mọi ngày val/test có H-step prediction hợp lệ
+    _seq_len_e = config.get("model", {}).get("seq_len", 30)
+    _horizon_e = config.get("model", {}).get("forecast_horizon", 1)
+    _ctx_len_e  = _seq_len_e + _horizon_e - 1
+
+    def _predict_ctx(context_df, target_df):
+        if len(context_df) == 0:
+            return loaded_model.predict(target_df)
+        combined = pd.concat([context_df, target_df]).reset_index(drop=True)
+        return loaded_model.predict(combined)[len(context_df):]
+
+    train_ctx = train_df.groupby("Store", group_keys=False).tail(_ctx_len_e) \
+        if "Store" in train_df.columns else train_df.tail(_ctx_len_e)
+    val_ctx   = val_df.groupby("Store", group_keys=False).tail(_ctx_len_e) \
+        if "Store" in val_df.columns else val_df.tail(_ctx_len_e)
+
+    eval_sets = [
+        ("validation", val_df,  _predict_ctx(train_ctx, val_df)),
+        ("test",       test_df, _predict_ctx(val_ctx,   test_df)),
+    ]
 
     # đánh giá trên cả val và test -> val để tune, test để báo cáo kết quả cuối cùng
-    for split_name, split_df in [("validation", val_df), ("test", test_df)]:
+    for split_name, split_df, preds in eval_sets:
         if len(split_df) == 0:
             continue
-        metrics = loaded_model.evaluate(split_df)
+        y_true = _get_true_sales(split_df)
+        metrics = evaluate_all(y_true, preds)
         typer.echo(f"{split_name.capitalize()} metrics: {metrics}")
 
         # Save plots
-        preds = loaded_model.predict(split_df)
         plot_predictions(
-            split_df["Sales"].values, preds,
+            y_true, preds,
             title=f"{model} - {split_name}",
             save_path=f"{run_dir}/{split_name}_predictions.png",
         )
         plot_residuals(
-            split_df["Sales"].values, preds,
+            y_true, preds,
             title=f"{model} - {split_name}",
             save_path=f"{run_dir}/{split_name}_residuals.png",
         )

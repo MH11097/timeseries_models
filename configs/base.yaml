@@ -16,6 +16,28 @@ seed: 42
 
 max_stores: null  # set to int (e.g. 50) for dev, null for full run
 
+# Dùng log1p(Sales) làm target thay vì Sales thô:
+# - Phân phối đều hơn (giảm skewness)
+# - MSELoss trên log(Sales) ≈ tối ưu RMSPE trực tiếp
+# - Predictions được inverse-transform (expm1) trước khi tính metrics
+use_log_sales: false
+
+# Chiến lược dự báo nhiều bước tương lai:
+# - "direct":      1 model dự đoán tại đúng 1 điểm T+H (mặc định, nhanh nhất)
+# - "multioutput": 1 model output H giá trị [T+1, T+2, ..., T+H] cùng lúc
+# - "recursive":   1 model train bước T+1, lăn bánh H lần khi predict
+forecast_strategy: "direct"
+
+# Hàm loss dùng để train:
+# - "mse":   Mean Squared Error — ổn định, hội tụ nhanh (mặc định)
+# - "mae":   Mean Absolute Error — ít nhạy với outlier hơn MSE, hội tụ chậm hơn
+# - "rmspe": Root Mean Squared % Error — gần với metric thi đấu Rossmann
+#            ⚠ Không ổn định khi Sales=0 (closed stores). Nên dùng với use_log_sales=true
+# - "mape":  Mean Absolute % Error — scale-invariant
+#            ⚠ Tương tự RMSPE, không ổn khi Sales=0
+# Lưu ý: khi use_log_sales=true, MSE trên log(Sales) ≈ tối ưu RMSPE trực tiếp
+loss_fn: "mse"
+
 metrics:
   primary: rmspe
   secondary: [rmse, mae, mape]

@@ -1,0 +1,6 @@
+{
+  "_comment": "CẢNH BÁO: seq_len phải <= 60 (val_min=64, seq_len≥64 → Store 674 có 0 val windows → crash early stopping). seq_len=90 đã bị xóa.",
+  "model.hidden_size": [64, 128],
+  "model.num_layers": [1, 2],
+  "model.seq_len": [44, 60]
+}

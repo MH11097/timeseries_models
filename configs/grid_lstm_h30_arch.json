@@ -1,0 +1,6 @@
+{
+  "_comment": "Phase 2b: Tìm best architecture, dùng dropout/weight_decay tốt nhất từ phase 2a. (4 combos)",
+  "_usage": "Sau khi chạy phase 2a, xem result.json để lấy dropout + weight_decay tốt nhất, thêm vào --set khi chạy file này.",
+  "model.hidden_size": [64, 128, 256],
+  "model.num_layers": [1, 2]
+}

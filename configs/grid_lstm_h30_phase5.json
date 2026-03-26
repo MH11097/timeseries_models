@@ -1,0 +1,10 @@
+{
+  "_comment": "Phase E: LR tuning for larger architectures. Phase D showed hidden>=128 overfits fast at LR=0.0005 (best_ep=1..12). Fixed: seq_len=21, dropout=0.2, wd=0.0, layers=1. Grid: hidden=[128,256] x lr=[1e-4, 2.5e-4] = 4 combos.",
+  "forecast_strategy": "multioutput",
+  "model.seq_len": [21],
+  "model.dropout": [0.2],
+  "model.weight_decay": [0.0],
+  "model.num_layers": [1],
+  "model.hidden_size": [128, 256],
+  "model.learning_rate": [0.0001, 0.00025]
+}

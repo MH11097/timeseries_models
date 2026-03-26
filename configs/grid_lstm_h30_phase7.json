@@ -1,0 +1,9 @@
+{
+  "forecast_strategy": ["multioutput"],
+  "model.seq_len":      [21],
+  "model.hidden_size":  [64],
+  "model.num_layers":   [2],
+  "model.weight_decay": [0.0],
+  "model.dropout":      [0.1, 0.2, 0.3],
+  "model.learning_rate":[0.0001, 0.00025]
+}

@@ -1,0 +1,85 @@
+# ============================================================
+# Feature Selection Config — Rossmann Store Sales
+# ============================================================
+# Bật/tắt từng nhóm feature bằng cách đổi true/false.
+# Các feature cụ thể trong mỗi nhóm được liệt kê trong phần
+# "feature_cols" để dễ tham khảo (không ảnh hưởng code).
+#
+# Để ghi đè từ CLI:
+#   --set features.use_lag=true
+#   --set features.lag_windows=[1,7,364]
+# ============================================================
+
+features:
+
+  # --- Nhóm 1: Time features (từ cột Date) ---
+  # Year, Month, WeekOfYear, DayOfMonth, DayOfWeek, IsWeekend
+  use_time: true
+
+  # --- Nhóm 2: Lag features (Sales_lag_<n>) ---
+  # Signal mạnh nhất: lag_1 (hôm qua), lag_7 (tuần trước cùng DayOfWeek)
+  # lag_364: cùng DayOfWeek năm ngoái → bắt yearly seasonality
+  use_lag: true
+  lag_windows: [1, 7, 14, 30, 364]
+  # Tắt yearly lag nếu train data < 1 năm:
+  # lag_windows: [1, 7, 14, 30]
+
+  # --- Nhóm 3: Rolling features (mean/std/median theo cửa sổ) ---
+  # mean: xu hướng ngắn hạn; std: mức biến động; median: robust với spike ngày lễ
+  use_rolling: true
+  rolling_windows: [7, 14, 30]
+  rolling_stats: [mean, std, median]   # bật/tắt từng thống kê
+  # rolling_stats: [mean, std]         # bỏ median nếu muốn giảm số features
+
+  # --- Nhóm 4: Competition features ---
+  # CompetitionOpenMonths: số tháng kể từ khi đối thủ mở cửa
+  use_competition: true
+
+  # --- Nhóm 5: Promo distance features ---
+  # DaysSinceLastPromo: ngày kể từ promo cuối
+  # DaysToNextPromo:    ngày đến promo tiếp theo (không phải leakage — lịch công bố trước)
+  use_promo_distance: true
+
+  # --- Nhóm 6: Store × DayOfWeek average ---
+  # StoreDOWAvg: baseline sales trung bình của store X vào ngày Y trong tuần
+  # Feature rất sạch và signal mạnh. Tắt nếu muốn model tự học từ sequence.
+  use_store_dow: true
+
+  # --- Nhóm 7: Promo2 active flag ---
+  # Promo2Active: 1 nếu tháng hiện tại nằm trong PromoInterval của store
+  use_promo2: true
+
+  # ============================================================
+  # Tham khảo nhanh: toàn bộ 32 features khi bật hết
+  # ============================================================
+  # Time (6):        Year, Month, WeekOfYear, DayOfMonth, DayOfWeek, IsWeekend
+  # Lag (5):         Sales_lag_1, _7, _14, _30, _364
+  # Rolling (9):     Sales_rolling_mean_7/14/30, _std_7/14/30, _median_7/14/30
+  # Competition (1): CompetitionOpenMonths
+  # Promo dist (2):  DaysSinceLastPromo, DaysToNextPromo
+  # Store DOW (1):   StoreDOWAvg
+  # Promo2 (1):      Promo2Active
+  # Raw cols (7):    Store, DayOfWeek(*), Promo, StateHoliday, SchoolHoliday,
+  #                  StoreType, Assortment
+  #                  (*) DayOfWeek vừa là raw vừa là time feature
+
+  # ============================================================
+  # Preset nhanh — bỏ comment một khối để dùng
+  # ============================================================
+
+  # [MINIMAL — 18 features, giống bộ của teammate]
+  # use_lag: true
+  # lag_windows: [1]
+  # use_rolling: true
+  # rolling_windows: [7, 14]
+  # rolling_stats: [mean, std]
+  # use_competition: true
+  # use_promo_distance: false
+  # use_store_dow: false
+  # use_promo2: false
+
+  # [RECOMMENDED — 32 features, bộ đầy đủ hiện tại]
+  # (giữ nguyên mặc định ở trên)
+
+  # [NO_YEARLY_LAG — 31 features, bỏ lag_364 nếu train <1 năm]
+  # lag_windows: [1, 7, 14, 30]
