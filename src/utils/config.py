@@ -7,9 +7,9 @@ import yaml
 
 # Key hyperparams per model for slug generation
 _SLUG_KEYS: dict[str, list[str]] = {
-    "arima": ["order"],
-    "sarimax": ["order", "seasonal_order"],
-    "prophet": ["changepoint_prior_scale", "seasonality_mode"],
+    "arima": ["order", "trend"],
+    "sarimax": ["order", "seasonal_order", "trend"],
+    "prophet": ["changepoint_prior_scale", "seasonality_mode", "seasonality_prior_scale", "holidays_prior_scale", "n_changepoints", "changepoint_range"],
     "xgboost": ["max_depth", "n_estimators", "learning_rate"],
     "rnn": ["hidden_size", "num_layers"],
     "lstm": ["hidden_size", "num_layers"],
@@ -35,7 +35,7 @@ def load_config(model_name: str | None = None, overrides: dict | None = None) ->
 
     Args:
         model_name: Model name to load specific config (e.g. "arima" -> configs/arima.yaml)
-        overrides: Dict of dotted-key overrides (e.g. {"max_stores": 50})
+        overrides: Dict of dotted-key overrides (e.g. {"store_type": "c"})
     """
     # base.yaml chứa config chung (seed, split dates, data paths) -> nền tảng cho mọi model
     base_path = CONFIGS_DIR / "base.yaml"
@@ -50,7 +50,7 @@ def load_config(model_name: str | None = None, overrides: dict | None = None) ->
                 model_config = yaml.safe_load(f) or {}
             config = _deep_merge(config, model_config)
 
-    # CLI overrides (--set max_stores=50) ưu tiên cao nhất -> ghi đè mọi config file
+    # CLI overrides (--set store_type=c) ưu tiên cao nhất -> ghi đè mọi config file
     if overrides:
         for key, value in overrides.items():
             _set_nested(config, key, value)

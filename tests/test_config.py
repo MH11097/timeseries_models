@@ -27,8 +27,8 @@ def test_deep_merge():
 
 
 def test_overrides():
-    config = load_config(overrides={"max_stores": 10})
-    assert config["max_stores"] == 10
+    config = load_config(overrides={"store_type": "c"})
+    assert config["store_type"] == "c"
 
 
 def test_make_param_slug_arima():

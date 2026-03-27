@@ -6,7 +6,7 @@ from pathlib import Path
 import typer
 
 from src.data.features import add_all_features
-from src.data.loader import load_cleaned_data, load_raw_data, sample_stores
+from src.data.loader import filter_stores, load_cleaned_data, load_raw_data
 from src.data.preprocessor import preprocess
 from src.evaluation.cross_validation import walk_forward_cv
 from src.models import get_model_class
@@ -46,7 +46,7 @@ def evaluate(
             df, _ = load_cleaned_data(config)
         else:
             df, _ = load_raw_data(config)
-        df = sample_stores(df, config)
+        df = filter_stores(df, config)
         df = add_all_features(df)
 
         model_class = get_model_class(model)
@@ -98,7 +98,7 @@ def evaluate(
         df, _ = load_cleaned_data(config)
     else:
         df, _ = load_raw_data(config)
-    df = sample_stores(df, config)
+    df = filter_stores(df, config)
     df = add_all_features(df)
     _, val_df, test_df, _ = preprocess(df, config)
 
@@ -107,9 +107,13 @@ def evaluate(
         if len(split_df) == 0:
             continue
 
-        # Limit to specified number of days if eval_days is provided
+        # giới hạn theo số ngày unique, không phải số dòng
+       
+        # head(N) chỉ lấy N dòng đầu = 1 store duy nhất do sort (Store, Date)
         if eval_days is not None:
-            eval_df = split_df.head(eval_days)
+            first_n_dates = sorted(split_df["Date"].unique())[:eval_days]
+            # eval_df = split_df.head(eval_days)
+            eval_df = split_df[split_df["Date"].isin(first_n_dates)]
             typer.echo(f"Evaluating on first {eval_days} days ({len(eval_df)} samples)")
         else:
             eval_df = split_df

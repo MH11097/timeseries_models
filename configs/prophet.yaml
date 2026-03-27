@@ -1,6 +1,15 @@
+store_type: "c"
+
 model:
   name: prophet
-  changepoint_prior_scale: 0.05
+  # Trend: độ linh hoạt đường xu hướng (nhỏ=mượt, lớn=flexible)
+  changepoint_prior_scale: 0.04   # 0.05→0.04: trend mượt hơn một chút
+  n_changepoints: 25
+  changepoint_range: 0.95          # 0.8→0.95: cho phép changepoints ở 95% data → trend linh hoạt hơn ở cuối
+  # Seasonality: mùa vụ cộng (additive) hay nhân (multiplicative)
   seasonality_mode: multiplicative
-  regressors: [Promo]
-  max_stores: 50
+  seasonality_prior_scale: 0.1     # 10→0.1: regularize seasonality mạnh hơn → tránh overfit seasonal noise
+  # Holiday: biên độ ảnh hưởng ngày lễ
+  holidays_prior_scale: 0.1        # 10→0.1: regularize holiday effect → tránh overfit từng ngày lễ riêng lẻ
+  regressors: [Promo, SchoolHoliday]
+  skip_scaling: true

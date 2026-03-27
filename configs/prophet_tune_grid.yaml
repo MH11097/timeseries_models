@@ -1,0 +1,19 @@
+# Custom grid config cho Prophet tuning.
+# Dùng với: python scripts/tune_prophet.py --grid-config configs/prophet_tune_grid.yaml
+#
+# Chỉnh sửa param_space để thử các vùng tham số khác nhau.
+# Mỗi key là tên tham số Prophet, value là list giá trị muốn thử.
+# Grid search sẽ chạy Cartesian product của tất cả các list.
+
+param_space:
+  # Trend: độ linh hoạt đường xu hướng (nhỏ=mượt, lớn=flexible)
+  changepoint_prior_scale: [0.001, 0.01, 0.05, 0.1, 0.5]
+
+  # Mùa vụ: cộng (additive) khi biên độ không đổi, nhân (multiplicative) khi biên độ tỉ lệ trend
+  seasonality_mode: [additive, multiplicative]
+
+  # Biên độ dao động mùa vụ (nhỏ=ít dao động, lớn=linh hoạt hơn)
+  seasonality_prior_scale: [0.1, 1.0, 10.0]
+
+  # Biên độ ảnh hưởng ngày lễ (nhỏ=ít ảnh hưởng, lớn=linh hoạt hơn)
+  holidays_prior_scale: [0.1, 1.0, 10.0]

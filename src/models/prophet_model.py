@@ -18,10 +18,16 @@ class ProphetModel(BaseModel):
     def __init__(self, config: dict):
         super().__init__(config)
         model_cfg = config.get("model", {})
+        # Trend: độ linh hoạt đường xu hướng (nhỏ=mượt, lớn=flexible với changepoint)
         self.changepoint_prior_scale = model_cfg.get("changepoint_prior_scale", 0.05)
+        self.n_changepoints = model_cfg.get("n_changepoints", 25)
+        self.changepoint_range = model_cfg.get("changepoint_range", 0.8)
+        # Seasonality: mùa vụ cộng (additive) hay nhân (multiplicative) theo trend
         self.seasonality_mode = model_cfg.get("seasonality_mode", "multiplicative")
+        self.seasonality_prior_scale = model_cfg.get("seasonality_prior_scale", 10.0)
+        # Holiday: biên độ ảnh hưởng ngày lễ Đức lên doanh số
+        self.holidays_prior_scale = model_cfg.get("holidays_prior_scale", 10.0)
         self.regressors = model_cfg.get("regressors", ["Promo"])
-        self.max_stores = model_cfg.get("max_stores", config.get("max_stores"))
         self.models: dict = {}
 
     def _prepare_prophet_df(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -40,9 +46,6 @@ class ProphetModel(BaseModel):
 
         start = time.time()
         stores = sorted(train_df["Store"].unique())
-        if self.max_stores:
-            stores = stores[: self.max_stores]
-
         failed = 0
         for store_id in stores:
             store_data = train_df[train_df["Store"] == store_id].sort_values("Date")
@@ -52,7 +55,11 @@ class ProphetModel(BaseModel):
                     warnings.simplefilter("ignore")
                     m = Prophet(
                         changepoint_prior_scale=self.changepoint_prior_scale,
+                        n_changepoints=self.n_changepoints,
+                        changepoint_range=self.changepoint_range,
                         seasonality_mode=self.seasonality_mode,
+                        seasonality_prior_scale=self.seasonality_prior_scale,
+                        holidays_prior_scale=self.holidays_prior_scale,
                     )
                     # Rossmann là chuỗi siêu thị Đức -> thêm ngày lễ Đức để bắt pattern lễ tự động
                     m.add_country_holidays(country_name="DE")
@@ -70,6 +77,8 @@ class ProphetModel(BaseModel):
         return {"stores_fitted": len(self.models), "stores_failed": failed, "time": self._training_time}
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
+        # reset index vì sau split, index gốc không liên tục → gán vào array positional sẽ out of bounds
+        df = df.reset_index(drop=True)
         predictions = np.zeros(len(df))
         for store_id, group in df.groupby("Store"):
             idx = group.index

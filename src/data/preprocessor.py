@@ -10,7 +10,7 @@ def preprocess(df: pd.DataFrame, config: dict) -> tuple[pd.DataFrame, pd.DataFra
 
     Args:
         df: Merged train+store DataFrame
-        config: Config dict with split dates
+        config: Config dict with split dates, model.skip_scaling để bỏ qua StandardScaler
 
     Returns:
         (train_df, val_df, test_df, scaler)
@@ -22,14 +22,25 @@ def preprocess(df: pd.DataFrame, config: dict) -> tuple[pd.DataFrame, pd.DataFra
     # time series không shuffle random -> split theo thời gian để tránh data leakage từ tương lai
     split_cfg = config["split"]
     train_df = df[df["Date"] <= split_cfg["train_end"]].copy()
-    val_df = df[(df["Date"] >= split_cfg["val_start"]) & (df["Date"] <= split_cfg["val_end"])].copy()
-    test_df = df[df["Date"] >= split_cfg["test_start"]].copy()
 
-    # các feature có scale khác nhau (CompetitionDistance ~hàng nghìn, Promo 0/1) -> chuẩn hoá về mean=0, std=1
-    # fit trên train, transform val/test -> tránh data leakage từ tập validation/test
+    # Val: optional — tiểu luận chỉ cần train+test, bỏ val để đơn giản hoá
+    if "val_start" in split_cfg and "val_end" in split_cfg:
+        val_df = df[(df["Date"] >= split_cfg["val_start"]) & (df["Date"] <= split_cfg["val_end"])].copy()
+    else:
+        val_df = pd.DataFrame(columns=df.columns)
+
+    # Test: thêm test_end filter để giới hạn đúng 30 ngày cuối
+    test_mask = df["Date"] >= split_cfg["test_start"]
+    if "test_end" in split_cfg:
+        test_mask &= df["Date"] <= split_cfg["test_end"]
+    test_df = df[test_mask].copy()
+
+    # Prophet/ARIMA tự xử lý trend+seasonality → skip scaling để giữ giá trị gốc cho regressor (Promo 0/1...)
+    # Các model khác (XGBoost, NN) cần chuẩn hoá feature về mean=0, std=1 vì scale khác nhau
+    skip_scaling = config.get("model", {}).get("skip_scaling", False)
     numeric_cols = _get_numeric_feature_cols(train_df)
     scaler = StandardScaler()
-    if numeric_cols:
+    if numeric_cols and not skip_scaling:
         train_df[numeric_cols] = scaler.fit_transform(train_df[numeric_cols])
         val_df[numeric_cols] = scaler.transform(val_df[numeric_cols])
         test_df[numeric_cols] = scaler.transform(test_df[numeric_cols])

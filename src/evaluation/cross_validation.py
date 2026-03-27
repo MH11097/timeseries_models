@@ -64,21 +64,27 @@ def walk_forward_cv(
         train_df = df[df["Date"].isin(train_dates)].copy()
         test_df = df[df["Date"].isin(test_dates)].copy()
 
-        # Limit test fold to first eval_days days to ensure consistent evaluation period
+        # giới hạn theo số ngày unique, không phải số dòng
+        # test_df = test_df.head(eval_days)
+        # head(N) chỉ lấy N dòng đầu = 1 store duy nhất do sort (Store, Date)
         if eval_days is not None and eval_days > 0:
-            test_df = test_df.head(eval_days)
+            first_n_dates = sorted(test_df["Date"].unique())[:eval_days]
+            test_df = test_df[test_df["Date"].isin(first_n_dates)]
+            # test_df = test_df.head(eval_days)
 
-        # Apply preprocessing per-fold to avoid data leakage:
-        # - Handle missing values and encode categoricals for both train and test
-        # - Fit scaler only on train_df, then transform both sets
+        # preprocessing per-fold để tránh data leakage:
+        # - handle missing values và encode categoricals cho cả train/test
+        # - fit scaler chỉ trên train_df, rồi transform cả 2 set
         train_df = _handle_missing_values(train_df)
         test_df = _handle_missing_values(test_df)
         train_df = _encode_categoricals(train_df)
         test_df = _encode_categoricals(test_df)
 
-        # Scale features: fit scaler on train, apply to test
+        # tree-based models (XGBoost) không cần scaling → đọc skip_scaling từ config
+        # reuse cùng pattern với preprocessor.py:40
+        skip_scaling = config.get("model", {}).get("skip_scaling", False)
         numeric_cols = _get_numeric_feature_cols(train_df)
-        if numeric_cols:
+        if numeric_cols and not skip_scaling:
             scaler = StandardScaler()
             train_df[numeric_cols] = scaler.fit_transform(train_df[numeric_cols])
             test_df[numeric_cols] = scaler.transform(test_df[numeric_cols])

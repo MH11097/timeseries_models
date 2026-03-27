@@ -1,4 +1,7 @@
+store_type: "c"
+
 model:
   name: arima
   order: [1, 1, 1]
-  max_stores: 50
+  trend: t       # d=1 → 'c' bị loại bỏ bởi differencing, dùng 't' thay thế (tương đương constant trên chuỗi sai phân)
+  skip_scaling: true    # ARIMA dùng giá trị gốc, không cần StandardScaler

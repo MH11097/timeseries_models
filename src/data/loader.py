@@ -60,11 +60,13 @@ def load_cleaned_data(config: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
     return train_df, store_df
 
 
-def sample_stores(df: pd.DataFrame, config: dict) -> pd.DataFrame:
-    """Sample subset of stores if max_stores is set in config."""
-    # 1115 store train rất lâu (nhất là ARIMA/Prophet fit từng store) -> giới hạn số store để dev/test nhanh
-    max_stores = config.get("max_stores")
-    if max_stores is not None:
-        stores = sorted(df["Store"].unique())[:max_stores]
-        df = df[df["Store"].isin(stores)].reset_index(drop=True)
+def filter_stores(df: pd.DataFrame, config: dict) -> pd.DataFrame:
+    """Lọc theo loại cửa hàng nếu store_type được set trong config.
+
+    Dùng cho per-store models (ARIMA, SARIMAX, Prophet) → chỉ giữ stores cùng loại
+    để kiểm soát biến khi so sánh model. Ví dụ store_type="c" → 148 stores type C.
+    """
+    store_type = config.get("store_type")
+    if store_type is not None:
+        df = df[df["StoreType"] == store_type].reset_index(drop=True)
     return df

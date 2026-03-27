@@ -8,34 +8,17 @@ import xgboost as xgb
 
 from src.models.base import BaseModel
 
-# danh sách feature đầu vào cho XGBoost - gồm store info, thời gian, lag/rolling, khuyến mãi, đối thủ
-# thứ tự không ảnh hưởng kết quả (tree-based), nhưng nhóm theo ý nghĩa để dễ đọc
+# danh sách feature đầu vào cho XGBoost — 18 features sau khi loại bỏ các feature ít đóng góp
+# (CompetitionDistance, lag_7/14/30, rolling_mean_30, rolling_std_14, Promo2Active)
+# dựa trên kết quả feature importance từ tuning → giảm noise, cải thiện RMSPE
 FEATURE_COLS = [
-    "Store",
-    "DayOfWeek",
-    "Promo",
-    "StateHoliday",
-    "SchoolHoliday",
-    "StoreType",
-    "Assortment",
-    "CompetitionDistance",
-    "Year",
-    "Month",
-    "WeekOfYear",
-    "DayOfMonth",
-    "IsWeekend",
+    "Store", "DayOfWeek", "Promo", "StateHoliday", "SchoolHoliday",
+    "StoreType", "Assortment",
+    "Year", "Month", "WeekOfYear", "DayOfMonth", "IsWeekend",
     "Sales_lag_1",
-    "Sales_lag_7",
-    "Sales_lag_14",
-    "Sales_lag_30",
-    "Sales_rolling_mean_7",
-    "Sales_rolling_mean_14",
-    "Sales_rolling_mean_30",
-    "Sales_rolling_std_7",
-    "Sales_rolling_std_14",
-    "Sales_rolling_std_30",
+    "Sales_rolling_mean_7", "Sales_rolling_mean_14",
+    "Sales_rolling_std_7", "Sales_rolling_std_30",
     "CompetitionOpenMonths",
-    "Promo2Active",
 ]
 
 
@@ -50,6 +33,8 @@ class XGBoostModel(BaseModel):
         self.learning_rate = model_cfg.get("learning_rate", 0.1)
         self.subsample = model_cfg.get("subsample", 0.8)
         self.colsample_bytree = model_cfg.get("colsample_bytree", 0.8)
+        self.reg_alpha = model_cfg.get("reg_alpha", 0)
+        self.reg_lambda = model_cfg.get("reg_lambda", 1)
         self.early_stopping_rounds = model_cfg.get("early_stopping_rounds", 50)
         self.model: xgb.XGBRegressor | None = None
         self.feature_cols: list[str] = []
@@ -71,6 +56,8 @@ class XGBoostModel(BaseModel):
             learning_rate=self.learning_rate,
             subsample=self.subsample,
             colsample_bytree=self.colsample_bytree,
+            reg_alpha=self.reg_alpha,
+            reg_lambda=self.reg_lambda,
             random_state=self.config.get("seed", 42),
             n_jobs=-1,
         )

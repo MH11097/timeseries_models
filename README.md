@@ -4,14 +4,18 @@ Comparative framework for 6 time series forecasting models on the **Rossmann Sto
 
 ## Models
 
-| Model | Type | Fitting Strategy |
-|-------|------|------------------|
-| ARIMA | Statistical | Per-store |
-| SARIMAX | Statistical | Per-store |
-| Prophet | Statistical | Per-store |
-| XGBoost | ML | Global (Store as feature) |
-| RNN | Deep Learning | Global (Store as embedding) |
-| LSTM | Deep Learning | Global (Store as embedding) |
+| Model | Type | Fitting Strategy | Store Scope |
+|-------|------|------------------|-------------|
+| ARIMA | Statistical | Per-store | Type C (148 stores) |
+| SARIMAX | Statistical | Per-store | Type C (148 stores) |
+| Prophet | Statistical | Per-store | Type C (148 stores) |
+| XGBoost | ML | Global (Store as feature) | All (1,115 stores) |
+| RNN | Deep Learning | Global (Store as embedding) | All (1,115 stores) |
+| LSTM | Deep Learning | Global (Store as embedding) | All (1,115 stores) |
+
+> **Store type "c":** 3 per-store models chỉ train trên 148 stores type C để kiểm soát biến —
+> cùng loại cửa hàng, cùng đặc tính kinh doanh → so sánh thuần model vs model.
+> Global models (XGBoost, RNN, LSTM) vẫn dùng toàn bộ 1,115 stores vì chúng encode Store như feature.
 
 ## Dataset
 
@@ -48,7 +52,7 @@ source /root/.venvs/timeseries_models/bin/activate
 ### Train a model
 ```bash
 python scripts/train.py --model arima
-python scripts/train.py --model xgboost --set max_stores=50
+python scripts/train.py --model xgboost
 python scripts/train.py --all
 ```
 

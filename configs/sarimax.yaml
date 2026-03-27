@@ -1,6 +1,10 @@
+store_type: "c"
+
 model:
   name: sarimax
   order: [1, 1, 1]
-  seasonal_order: [1, 1, 1, 7]
-  exog_columns: [Promo, SchoolHoliday]
-  max_stores: 50
+  seasonal_order: [1, 0, 1, 7]   # D=0: bỏ seasonal differencing — CV verify: s=7 (21.8%) > s=6 (22.5%), s=12 unstable
+  trend: c
+  exog_columns: [Promo, SchoolHoliday, StateHoliday]  # +StateHoliday từ ablation (19.5% vs 20.1%)
+  maxiter: 200          # Kalman filter state space lớn cần nhiều iterations để hội tụ (50 → 200, cải thiện ~0.3pp)
+  skip_scaling: true    # SARIMAX dùng giá trị gốc, không cần StandardScaler

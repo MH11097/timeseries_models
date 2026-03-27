@@ -12,6 +12,7 @@ def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
     df["Quarter"] = df["Date"].dt.quarter
     df["WeekOfYear"] = df["Date"].dt.isocalendar().week.astype(int)
     df["DayOfMonth"] = df["Date"].dt.day
+    df["Quarter"] = df["Date"].dt.quarter
     df["DayOfWeek"] = df["Date"].dt.dayofweek
     # cuối tuần sales thường khác ngày thường -> tạo cờ binary để model phân biệt
     df["IsWeekend"] = (df["DayOfWeek"] >= 5).astype(int)

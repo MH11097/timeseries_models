@@ -7,14 +7,15 @@ data:
   use_cleaned: false
 
 split:
-  train_end: "2015-01-31"
-  val_start: "2015-02-01"
-  val_end: "2015-05-31"
-  test_start: "2015-06-01"
+  train_end: "2015-07-01"       # train toàn bộ data đến ngày này
+  test_start: "2015-07-02"      # test = 30 ngày cuối dataset
+  test_end: "2015-07-31"
+
+forecast_horizon: 30
 
 seed: 42
 
-max_stores: null  # set to int (e.g. 50) for dev, null for full run
+store_type: null  # lọc theo loại cửa hàng (a/b/c/d), null = tất cả
 
 metrics:
   primary: rmspe
