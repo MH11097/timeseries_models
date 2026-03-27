@@ -96,6 +96,10 @@ def walk_forward_cv(
 
         predictions = model.predict(test_df)
         y_true = test_df["Sales"].values
+        # khi use_log_sales=True: Sales trong test_df đang ở log1p space,
+        # nhưng model.predict() đã expm1 về scale gốc → cần inverse y_true để so sánh cùng scale
+        if config.get("use_log_sales", False):
+            y_true = np.expm1(y_true.astype(float))
         metrics = evaluate_all(y_true, predictions)
         metrics["fold"] = fold
         metrics["training_time_seconds"] = round(train_time, 2)
