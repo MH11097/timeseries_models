@@ -12,12 +12,23 @@ from src.models.base import BaseModel
 # (CompetitionDistance, lag_7/14/30, rolling_mean_30, rolling_std_14, Promo2Active)
 # dựa trên kết quả feature importance từ tuning → giảm noise, cải thiện RMSPE
 FEATURE_COLS = [
-    "Store", "DayOfWeek", "Promo", "StateHoliday", "SchoolHoliday",
-    "StoreType", "Assortment",
-    "Year", "Month", "WeekOfYear", "DayOfMonth", "IsWeekend",
+    "Store",
+    "DayOfWeek",
+    "Promo",
+    "StateHoliday",
+    "SchoolHoliday",
+    "StoreType",
+    "Assortment",
+    "Year",
+    "Month",
+    "WeekOfYear",
+    "DayOfMonth",
+    "IsWeekend",
     "Sales_lag_1",
-    "Sales_rolling_mean_7", "Sales_rolling_mean_14",
-    "Sales_rolling_std_7", "Sales_rolling_std_30",
+    "Sales_rolling_mean_7",
+    "Sales_rolling_mean_14",
+    "Sales_rolling_std_7",
+    "Sales_rolling_std_30",
     "CompetitionOpenMonths",
 ]
 

@@ -10,7 +10,6 @@ def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
     # Date chỉ là 1 cột -> tách thành nhiều feature thời gian để model bắt pattern theo mùa/tuần/ngày
     df["Year"] = df["Date"].dt.year
     df["Month"] = df["Date"].dt.month
-    df["Quarter"] = df["Date"].dt.quarter
     df["WeekOfYear"] = df["Date"].dt.isocalendar().week.astype(int)
     df["DayOfMonth"] = df["Date"].dt.day
     df["Quarter"] = df["Date"].dt.quarter

@@ -31,7 +31,7 @@ def evaluate(
     cv: str = typer.Option(None, "--cv", help="CV strategy: 'expanding' or 'sliding'"),
     n_splits: int = typer.Option(5, "--n-splits", help="Number of CV folds"),
     eval_days: int = typer.Option(
-        30, "--eval-days", help="Limit evaluation to first N days (default: 30)"
+        None, "--eval-days", help="Limit evaluation to first N days (default: None)"
     ),
 ):
     """Evaluate a model on validation/test data or run cross-validation."""
