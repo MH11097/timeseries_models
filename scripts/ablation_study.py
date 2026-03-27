@@ -10,7 +10,7 @@ import typer
 import numpy as np
 
 from src.data.features import add_all_features
-from src.data.loader import load_cleaned_data, load_raw_data, sample_stores
+from src.data.loader import load_cleaned_data, load_raw_data
 from src.data.preprocessor import preprocess
 from src.evaluation.metrics import evaluate_all
 from src.models import get_model_class
@@ -108,8 +108,6 @@ def run(
         df, _ = load_cleaned_data(config)
     else:
         df, _ = load_raw_data(config)
-
-    df = sample_stores(df, config)
 
     # Add all features
     typer.echo("Adding features...")

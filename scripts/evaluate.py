@@ -7,7 +7,7 @@ from pathlib import Path
 import typer
 
 from src.data.features import add_all_features, apply_log_transform
-from src.data.loader import load_raw_data, sample_stores
+from src.data.loader import load_raw_data, filter_stores
 from src.data.preprocessor import preprocess
 from src.evaluation.cross_validation import walk_forward_cv
 from src.evaluation.metrics import evaluate_all
@@ -43,7 +43,8 @@ def evaluate(
         # walk-forward CV mô phỏng thực tế: train trên quá khứ, test trên tương lai gần
         typer.echo(f"Running {cv} walk-forward CV with {n_splits} splits...")
         df, _ = load_raw_data(config)
-        df = sample_stores(df, config)
+        # lọc store type (vd: type "c") cho per-store models (ARIMA, SARIMAX, Prophet)
+        df = filter_stores(df, config)
         df = add_all_features(df, feature_cfg=config.get("features", {}))
         if config.get("use_log_sales", False):
             df = apply_log_transform(df)
@@ -92,7 +93,8 @@ def evaluate(
 
     # Load and preprocess data
     df, _ = load_raw_data(config)
-    df = sample_stores(df, config)
+    # lọc store type (vd: type "c") cho per-store models (ARIMA, SARIMAX, Prophet)
+    df = filter_stores(df, config)
     df = add_all_features(df, feature_cfg=config.get("features", {}))
     if config.get("use_log_sales", False):
         typer.echo("Applying log1p transform to Sales and derived features...")

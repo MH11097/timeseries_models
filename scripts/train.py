@@ -16,7 +16,7 @@ import typer
 
 from src.data.features import add_all_features
 from src.data.features import apply_log_transform
-from src.data.loader import load_cleaned_data, load_raw_data, sample_stores
+from src.data.loader import load_cleaned_data, load_raw_data, filter_stores
 from src.data.preprocessor import preprocess
 from src.models import MODEL_REGISTRY, get_model_class
 from src.utils.config import load_config, make_param_slug

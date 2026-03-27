@@ -11,7 +11,7 @@ import xgboost as xgb
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 
 from src.data.features import add_all_features
-from src.data.loader import load_cleaned_data, load_raw_data, sample_stores
+from src.data.loader import load_cleaned_data, load_raw_data
 from src.data.preprocessor import preprocess
 from src.evaluation.metrics import rmspe
 from src.utils.config import load_config
@@ -92,9 +92,6 @@ def grid_search(
         df, _ = load_cleaned_data(config)
     else:
         df, _ = load_raw_data(config)
-
-    if max_stores:
-        df = sample_stores(df, {"data": {"max_stores": max_stores}})
 
     typer.echo("Adding features...")
     df = add_all_features(df)

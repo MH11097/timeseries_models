@@ -74,12 +74,15 @@ class XGBoostModel(BaseModel):
         )
 
         # nếu có validation set -> dùng eval_set để XGBoost theo dõi loss trên val mỗi round
+        # early_stopping_rounds chỉ hoạt động khi có eval_set → dừng sớm nếu val loss không cải thiện
         fit_params = {}
         if val_df is not None and len(val_df) > 0:
             X_val = self._get_features(val_df)
             y_val = val_df["Sales"].values
             fit_params["eval_set"] = [(X_val, y_val)]
             fit_params["verbose"] = False
+            if self.early_stopping_rounds:
+                fit_params["early_stopping_rounds"] = self.early_stopping_rounds
 
         self.model.fit(X_train, y_train, **fit_params)
         self._training_time = time.time() - start
