@@ -53,7 +53,12 @@ class ARIMAModel(BaseModel):
                 failed += 1
 
         self._training_time = time.time() - start
-        return {"stores_fitted": len(self.models), "stores_failed": failed, "time": self._training_time}
+        return {
+            "training_time": self._training_time,
+            "n_samples": len(train_df),
+            "stores_fitted": len(self.models),
+            "stores_failed": failed,
+        }
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
         # mỗi store có model riêng → dự đoán từng nhóm store, ghép lại thành array đầy đủ

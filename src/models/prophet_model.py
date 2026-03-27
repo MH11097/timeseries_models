@@ -74,7 +74,12 @@ class ProphetModel(BaseModel):
                 failed += 1
 
         self._training_time = time.time() - start
-        return {"stores_fitted": len(self.models), "stores_failed": failed, "time": self._training_time}
+        return {
+            "training_time": self._training_time,
+            "n_samples": len(train_df),
+            "stores_fitted": len(self.models),
+            "stores_failed": failed,
+        }
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
         # reset index vì sau split, index gốc không liên tục → gán vào array positional sẽ out of bounds

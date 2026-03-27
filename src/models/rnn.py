@@ -155,10 +155,11 @@ class RNNModel(BaseModel):
         self._training_time = time.time() - start
         print(f"Training complete in {self._training_time:.1f}s")
         return {
+            "training_time": self._training_time,
+            "n_samples": len(train_df),
             "epochs_trained": epoch + 1,
-            "time": self._training_time,
-            "train_losses": train_losses,
-            "val_losses": val_losses,
+            "final_train_loss": train_losses[-1] if train_losses else None,
+            "final_val_loss": val_losses[-1] if val_losses else None,
         }
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:

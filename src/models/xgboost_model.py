@@ -86,7 +86,11 @@ class XGBoostModel(BaseModel):
 
         self.model.fit(X_train, y_train, **fit_params)
         self._training_time = time.time() - start
-        return {"n_features": len(self.feature_cols), "time": self._training_time}
+        return {
+            "training_time": self._training_time,
+            "n_samples": len(train_df),
+            "n_features": len(self.feature_cols),
+        }
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
         X = self._get_features(df)
