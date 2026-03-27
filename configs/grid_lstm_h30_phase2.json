@@ -1,0 +1,8 @@
+{
+  "_comment": "Phase C: Regularization grid. Strategy=multioutput + seq_len=21 (best từ Phase B). Grid: dropout x weight_decay = 9 combinations.",
+  "_insight": "Baseline (multioutput, seq_len=21): val_rmspe=0.2656. Thử dropout nhỏ hơn vì gap train/val nhỏ. weight_decay để kiểm soát norm weights.",
+  "forecast_strategy": "multioutput",
+  "model.seq_len": [21],
+  "model.dropout": [0.1, 0.2, 0.3],
+  "model.weight_decay": [0.0, 1e-5, 1e-4]
+}

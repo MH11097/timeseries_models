@@ -7,3 +7,6 @@ model:
   epochs: 50
   learning_rate: 0.001
   dropout: 0.1
+  forecast_horizon: 1  # số ngày dự đoán vào tương lai: 1, 7, 14, hoặc 30
+  patience: 10       # số epoch liên tiếp val_loss không cải thiện thì dừng
+  min_delta: 0.0001  # cải thiện nhỏ hơn mức này coi như "không cải thiện"

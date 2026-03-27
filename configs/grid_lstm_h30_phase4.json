@@ -1,0 +1,9 @@
+{
+  "_comment": "Phase D: Architecture scaling. Best từ Phase C: multioutput, seq_len=21, dropout=0.2, wd=0.0. Grid: hidden=[128,256] x layers=[1,2] = 4 combos.",
+  "forecast_strategy": "multioutput",
+  "model.seq_len": [21],
+  "model.dropout": [0.1, 0.2, 0.3],
+  "model.weight_decay": [0.0],
+  "model.hidden_size": [64],
+  "model.num_layers": [1, 2]
+}

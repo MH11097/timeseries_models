@@ -65,3 +65,7 @@ Thumbs.db
 # Misc
 *.log
 *.tmp
+
+EXPERIMENT_REPORT.md
+HUONG_DAN_UV.md
+

@@ -84,7 +84,10 @@ def _encode_categoricals(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _get_numeric_feature_cols(df: pd.DataFrame) -> list[str]:
-    """Get numeric columns suitable for scaling (exclude target, IDs, dates)."""
+    """Get numeric columns suitable for scaling (exclude target, IDs, dates, and ordinal flags)."""
     # Sales/Customers là target, Store là ID, Open là cờ -> không scale, chỉ scale feature thật sự
-    exclude = {"Sales", "Customers", "Store", "Date", "Open"}
-    return [c for c in df.select_dtypes(include=[np.number]).columns if c not in exclude]
+    # StateHoliday có 99.9% = 0 và chỉ 0.1% = 1/2/3 -> std cực nhỏ (~0.05)
+    # StandardScaler biến giá trị 3 (Christmas) thành +63 -> LSTM gate saturation (gradient = 0)
+    # Binary flags (lag_364_valid) không cần scale -> già trị đã là 0/1
+    _NO_SCALE = {"Sales", "Customers", "Store", "Date", "Open", "StateHoliday", "lag_364_valid"}
+    return [c for c in df.select_dtypes(include=[np.number]).columns if c not in _NO_SCALE]

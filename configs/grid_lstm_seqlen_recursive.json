@@ -1,0 +1,6 @@
+{
+  "_comment": "Phase A: Tìm best seq_len cho recursive H=30. Window train = seq_len+1 (H=1). ctx_len = seq_len+H-1 = seq_len+29.",
+  "_constraint": "val_min=64 (Store 674). val_loader windows = val_days - seq_len. seq_len<=60: Store 674 có 4+ windows. seq_len=63: absolute max (Store 674 có 1 window). Safe upper bound: 60.",
+  "_note": "Step=7 (weekly seasonality). train≈val loss → seq_len là lever chính trước regularization/arch.",
+  "model.seq_len": [14, 21, 30, 44, 60]
+}
