@@ -69,6 +69,13 @@ def _train_single(model_name: str, overrides: dict, experiment_name: str = ""):
     """Train 1 model + evaluate trên val & test set luôn."""
     config = load_config(model_name, overrides)
     set_seed(config.get("seed", 42))
+
+    # in toàn bộ config đang dùng → dễ debug khi kết quả bất thường
+    typer.echo(f"\n{'─'*50}")
+    typer.echo(f"Config for [{model_name}]:")
+    typer.echo(json.dumps(config, indent=2, default=str))
+    typer.echo(f"{'─'*50}\n")
+
     param_slug = make_param_slug(config)
 
     # thêm log/horizon vào tên thư mục để phân biệt ngay từ tên folder
@@ -129,6 +136,8 @@ def _train_single(model_name: str, overrides: dict, experiment_name: str = ""):
 
     def _predict_with_context(context_df, target_df):
         """Nối context_df (per-store tail) vào đầu target_df, predict, trả về predictions cho target_df."""
+        if len(target_df) == 0:
+            return np.array([])
         if len(context_df) == 0:
             return model.predict(target_df)
         combined = pd.concat([context_df, target_df]).reset_index(drop=True)
@@ -143,18 +152,20 @@ def _train_single(model_name: str, overrides: dict, experiment_name: str = ""):
     metrics = evaluate_all(y_true_val, val_predictions)
     typer.echo(f"Validation metrics: {metrics}")
 
-    # đánh giá trên test set -> prepend val context (ctx_len rows thay vì seq_len)
+    # đánh giá trên test set -> prepend context (val hoặc train) để ngày đầu test có prediction hợp lệ
     def _build_test_context():
-        """Trả về (combined_df, n_ctx) — combined đã có val tail đủ ctx_len rows, n_ctx = rows context."""
+        """Trả về (combined_df, n_ctx) — combined đã có context đủ ctx_len rows, n_ctx = rows context."""
         if "Store" in test_df.columns:
             min_rows = test_df.groupby("Store").size().min()
         else:
             min_rows = len(test_df)
         if min_rows < _ctx_len + 1:
-            val_tail = val_df.groupby("Store", group_keys=False).tail(_ctx_len) \
-                if "Store" in val_df.columns else val_df.tail(_ctx_len)
-            combined = pd.concat([val_tail, test_df]).reset_index(drop=True)
-            return combined, len(val_tail)
+            # val_df rỗng → fallback sang train_df tail làm context cho test
+            ctx_source = val_df if len(val_df) > 0 else train_df
+            ctx_tail = ctx_source.groupby("Store", group_keys=False).tail(_ctx_len) \
+                if "Store" in ctx_source.columns else ctx_source.tail(_ctx_len)
+            combined = pd.concat([ctx_tail, test_df]).reset_index(drop=True)
+            return combined, len(ctx_tail)
         return test_df, 0
 
     _test_combined, _n_ctx = _build_test_context()
@@ -203,7 +214,7 @@ def _train_single(model_name: str, overrides: dict, experiment_name: str = ""):
         "final_val_loss":   round(val_l[-1], 6)             if val_l   else None,
         "best_val_epoch":   int(np.argmin(val_l)) + 1       if val_l   else None,
     }
-    out_dir = model.save_results(results, results_dir)
+    out_dir = model.save_results(results, config.get("results_dir", "results"))
 
     # evaluate cả val lẫn test luôn → không cần chạy evaluate.py riêng sau khi train
     typer.echo("Evaluating...")

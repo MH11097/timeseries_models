@@ -61,6 +61,8 @@ class XGBoostModel(BaseModel):
         X_train = self._get_features(train_df)
         y_train = train_df["Sales"].values
 
+        # early_stopping_rounds đặt trong constructor (XGBoost >= 2.0 bỏ param này khỏi fit())
+        # chỉ có tác dụng khi truyền eval_set vào fit()
         self.model = xgb.XGBRegressor(
             n_estimators=self.n_estimators,
             max_depth=self.max_depth,
@@ -69,20 +71,18 @@ class XGBoostModel(BaseModel):
             colsample_bytree=self.colsample_bytree,
             reg_alpha=self.reg_alpha,
             reg_lambda=self.reg_lambda,
+            early_stopping_rounds=self.early_stopping_rounds or None,
             random_state=self.config.get("seed", 42),
             n_jobs=-1,
         )
 
         # nếu có validation set -> dùng eval_set để XGBoost theo dõi loss trên val mỗi round
-        # early_stopping_rounds chỉ hoạt động khi có eval_set → dừng sớm nếu val loss không cải thiện
         fit_params = {}
         if val_df is not None and len(val_df) > 0:
             X_val = self._get_features(val_df)
             y_val = val_df["Sales"].values
             fit_params["eval_set"] = [(X_val, y_val)]
             fit_params["verbose"] = False
-            if self.early_stopping_rounds:
-                fit_params["early_stopping_rounds"] = self.early_stopping_rounds
 
         self.model.fit(X_train, y_train, **fit_params)
         self._training_time = time.time() - start

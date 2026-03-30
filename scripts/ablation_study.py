@@ -117,12 +117,16 @@ def run(
     typer.echo("Preprocessing...")
     train_df, val_df, test_df, scaler = preprocess(df, config)
 
+    # val_df rỗng khi config không có val_start/val_end → dùng test_df thay thế
+    base_eval = val_df if len(val_df) > 0 else test_df
+
     # Limit to specified number of days if eval_days is provided
     if eval_days is not None:
-        eval_df = val_df.head(eval_days)
+        eval_df = base_eval.head(eval_days)
         typer.echo(f"Evaluating on first {eval_days} days ({len(eval_df)} samples)")
     else:
-        eval_df = val_df
+        eval_df = base_eval
+    typer.echo(f"Eval set: {'val' if len(val_df) > 0 else 'test'} ({len(eval_df)} rows)")
 
     # Filter available features
     available_base = _filter_features(df, BASE_FEATURES)
