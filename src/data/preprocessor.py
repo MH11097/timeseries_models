@@ -42,8 +42,11 @@ def preprocess(df: pd.DataFrame, config: dict) -> tuple[pd.DataFrame, pd.DataFra
     scaler = StandardScaler()
     if numeric_cols and not skip_scaling:
         train_df[numeric_cols] = scaler.fit_transform(train_df[numeric_cols])
-        val_df[numeric_cols] = scaler.transform(val_df[numeric_cols])
-        test_df[numeric_cols] = scaler.transform(test_df[numeric_cols])
+        # Guard: val/test có thể rỗng khi config không định nghĩa val split
+        if len(val_df) > 0:
+            val_df[numeric_cols] = scaler.transform(val_df[numeric_cols])
+        if len(test_df) > 0:
+            test_df[numeric_cols] = scaler.transform(test_df[numeric_cols])
 
     return train_df, val_df, test_df, scaler
 

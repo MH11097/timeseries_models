@@ -2,6 +2,7 @@
 
 import json
 import numpy as np
+import pandas as pd
 from pathlib import Path
 
 import typer
@@ -9,7 +10,7 @@ import typer
 from src.data.features import add_all_features, apply_log_transform
 from src.data.loader import load_raw_data, filter_stores
 from src.data.preprocessor import preprocess
-from src.evaluation.cross_validation import walk_forward_cv
+from src.evaluation.cross_validation import walk_forward_cv, walk_forward_cv_pretrained
 from src.evaluation.metrics import evaluate_all
 from src.models import get_model_class
 from src.models.base import BaseModel
@@ -40,7 +41,6 @@ def evaluate(
     set_seed(config.get("seed", 42))
 
     if cv:
-        # walk-forward CV mô phỏng thực tế: train trên quá khứ, test trên tương lai gần
         typer.echo(f"Running {cv} walk-forward CV with {n_splits} splits...")
         df, _ = load_raw_data(config)
         # lọc store type (vd: type "c") cho per-store models (ARIMA, SARIMAX, Prophet)
@@ -49,15 +49,35 @@ def evaluate(
         if config.get("use_log_sales", False):
             df = apply_log_transform(df)
 
-        model_class = get_model_class(model)
-        cv_results = walk_forward_cv(
-            model_class,
-            config,
-            df,
-            n_splits=n_splits,
-            expanding=(cv == "expanding"),
-            eval_days=eval_days,
-        )
+        if run_dir:
+            # CV nhanh: dùng model đã train sẵn, bỏ retrain mỗi fold
+            model_path = Path(run_dir) / "model.pkl"
+            if not model_path.exists():
+                typer.echo(f"Model not found at {model_path}", err=True)
+                raise typer.Exit(1)
+            typer.echo(f"Loading pre-trained model from {model_path}")
+            loaded_model = BaseModel.load(str(model_path))
+
+            cv_results = walk_forward_cv_pretrained(
+                loaded_model,
+                config,
+                df,
+                n_splits=n_splits,
+                expanding=(cv == "expanding"),
+                eval_days=eval_days,
+            )
+        else:
+            # CV chuẩn: retrain từ đầu mỗi fold (walk-forward thực sự)
+            model_class = get_model_class(model)
+            cv_results = walk_forward_cv(
+                model_class,
+                config,
+                df,
+                n_splits=n_splits,
+                expanding=(cv == "expanding"),
+                eval_days=eval_days,
+            )
+
         typer.echo(f"CV Results ({n_splits} folds):")
         for fold in cv_results["folds"]:
             typer.echo(f"  Fold {fold['fold']}: RMSPE={fold['rmspe']:.4f}")

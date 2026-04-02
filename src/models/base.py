@@ -1,5 +1,6 @@
 """Abstract base class for all forecasting models."""
 
+import io
 import json
 import pickle
 from abc import ABC, abstractmethod
@@ -44,7 +45,33 @@ class BaseModel(ABC):
 
     @classmethod
     def load(cls, path: str) -> "BaseModel":
-        """Load model from disk."""
+        """Load model from disk. Tự map CUDA → CPU nếu GPU không khả dụng."""
+        try:
+            import torch
+            if not torch.cuda.is_available():
+                # Model train trên CUDA nhưng load trên CPU:
+                # pickle gọi torch.storage._load_from_bytes bên trong → patch tạm để thêm map_location
+                _orig = torch.storage._load_from_bytes
+                torch.storage._load_from_bytes = lambda b: torch.load(
+                    io.BytesIO(b), map_location="cpu", weights_only=False
+                )
+                try:
+                    with open(path, "rb") as f:
+                        obj = pickle.load(f)
+                finally:
+                    torch.storage._load_from_bytes = _orig
+            else:
+                with open(path, "rb") as f:
+                    obj = pickle.load(f)
+            # Chuyển device attribute + network weights sang device hiện tại
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            if hasattr(obj, "device"):
+                obj.device = device
+            if hasattr(obj, "net") and obj.net is not None:
+                obj.net.to(device)
+            return obj
+        except ImportError:
+            pass
         with open(path, "rb") as f:
             return pickle.load(f)
 

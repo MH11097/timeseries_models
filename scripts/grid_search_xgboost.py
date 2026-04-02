@@ -1,5 +1,6 @@
-"""Grid search for XGBoost models with specific hyperparameter ranges."""
+"""Grid search for XGBoost — train/test split (giống train.py), không CV mỗi combo."""
 
+import itertools
 import json
 import time
 from pathlib import Path
@@ -7,263 +8,174 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import typer
-import xgboost as xgb
-from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 
 from src.data.features import add_all_features
-from src.data.loader import load_cleaned_data, load_raw_data
+from src.data.loader import load_raw_data
 from src.data.preprocessor import preprocess
-from src.evaluation.metrics import rmspe
+from src.evaluation.metrics import evaluate_all
+from src.models.xgboost_model import XGBoostModel
 from src.utils.config import load_config
 from src.utils.seed import set_seed
 
-app = typer.Typer(help="GridSearchCV for XGBoost models with custom parameter ranges.")
-
-# Features for XGBoost model
-FEATURE_COLS = [
-    "Store",
-    "DayOfWeek",
-    "Promo",
-    "StateHoliday",
-    "SchoolHoliday",
-    "StoreType",
-    "Assortment",
-    "CompetitionDistance",
-    "Year",
-    "Month",
-    "WeekOfYear",
-    "DayOfMonth",
-    "IsWeekend",
-    "Sales_lag_1",
-    "Sales_lag_7",
-    "Sales_lag_14",
-    "Sales_lag_30",
-    "Sales_rolling_mean_7",
-    "Sales_rolling_mean_14",
-    "Sales_rolling_mean_30",
-    "Sales_rolling_std_7",
-    "Sales_rolling_std_14",
-    "Sales_rolling_std_30",
-    "CompetitionOpenMonths",
-    "Promo2Active",
-]
-
-
-def get_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Extract available features from dataframe."""
-    available = [c for c in FEATURE_COLS if c in df.columns]
-    return df[available].fillna(0)
+app = typer.Typer(help="Grid search XGBoost dùng train/test split (giống train.py).")
 
 
 @app.command()
-def grid_search(
-    model_name: str = "xgboost",
-    use_cleaned: bool = True,
-    cv_splits: int = 5,
-    n_jobs: int = -1,
-    max_stores: int | None = None,
-):
+def grid_search(model_name: str = "xgboost"):
     """
-    Run GridSearchCV for XGBoost models with custom parameters.
+    Grid search XGBoost — train trên train set, evaluate trên test set.
 
-    Parameters:
-        - max_depth: [9, 11]
-        - learning_rate: [0.01, 0.05]
-        - n_estimators: [300, 500]
-        - subsample: [1.0] (fixed)
-        - colsample_bytree: [1.0] (fixed)
-
-    Args:
-        model_name: Model name (default: xgboost)
-        use_cleaned: Use pre-cleaned data (default: True)
-        cv_splits: Number of cross-validation splits (default: 5)
-        n_jobs: Number of parallel jobs (-1 = all cores, default: -1)
-        max_stores: Limit number of stores for faster testing (default: None)
+    Workflow: tìm best params bằng grid search → sau đó chạy CV 1 lần với best params.
+    Tham số cố định: max_depth=9, subsample=1.0, colsample_bytree=0.8
+    Tham số tìm kiếm: learning_rate, n_estimators, reg_alpha, reg_lambda
     """
-    typer.echo("=== GridSearchCV for XGBoost Models ===")
+    typer.echo("=== XGBoost Grid Search (train/test split) ===")
 
-    # Load configuration and data
     config = load_config(model_name)
-    seed = config.get("seed", 42)
-    set_seed(seed)
+    set_seed(config.get("seed", 42))
 
-    typer.echo("Loading data...")
-    if use_cleaned:
-        df, _ = load_cleaned_data(config)
-    else:
-        df, _ = load_raw_data(config)
-
-    typer.echo("Adding features...")
-    df = add_all_features(df)
+    # Load data + features 1 lần, preprocess 1 lần → dùng chung cho mọi combo
+    typer.echo("Loading data & features...")
+    df, _ = load_raw_data(config)
+    df = add_all_features(df, feature_cfg=config.get("features", {}))
 
     typer.echo("Preprocessing...")
     train_df, val_df, test_df, scaler = preprocess(df, config)
+    typer.echo(f"Train: {len(train_df):,} rows | Test: {len(test_df):,} rows")
 
-    # Combine train and val for GridSearchCV
-    combined_df = pd.concat([train_df, val_df], ignore_index=True)
-    X = get_features(combined_df)
-    y = combined_df["Sales"].values
-
-    typer.echo(f"Data shape: X={X.shape}, y={y.shape}")
-
-    # Define parameter grid
+    # Parameter grid — chỉ tune 4 tham số
     param_grid = {
-        "max_depth": [9],
         "learning_rate": [0.03, 0.05],
         "n_estimators": [500, 800, 1000],
-        "subsample": [1.0],
-        "colsample_bytree": [0.8],
         "reg_alpha": [0.5, 1, 1.5],
         "reg_lambda": [1.5, 2, 2.5],
     }
 
-    # Calculate total parameter combinations
-    n_combos = 1
-    for v in param_grid.values():
-        n_combos *= len(v)
+    param_names = list(param_grid.keys())
+    combinations = list(itertools.product(*param_grid.values()))
+    n_combos = len(combinations)
 
     typer.echo(f"\nParameter Grid:")
     for param, values in param_grid.items():
         typer.echo(f"  {param}: {values}")
-
-    # Create base model
-    base_model = xgb.XGBRegressor(random_state=seed, n_jobs=1)
-
-    # Custom scoring function using RMSPE
-    # sklearn scorer signature: scorer(estimator, X_test, y_test)
-    def rmspe_scorer(estimator, X_test, y_test):
-        y_pred = estimator.predict(X_test)
-        y_pred = np.clip(y_pred, 0, None)  # Ensure non-negative predictions
-        return -rmspe(
-            y_test, y_pred
-        )  # Negative because sklearn expects higher is better
-
-    # Create time series cross-validator (replaces random splits)
-    ts_cv = TimeSeriesSplit(n_splits=cv_splits)
-
-    typer.echo("\n" + "=" * 80)
-    typer.echo("TIME SERIES GRIDSEARCHCV (Walk-Forward Validation)")
+    typer.echo(f"Total combinations: {n_combos}")
     typer.echo("=" * 80)
 
-    typer.echo(f"Total parameter combinations: {n_combos}")
-    typer.echo(f"CV splits (TimeSeriesSplit): {cv_splits}")
-    typer.echo(f"Total model evaluations: {n_combos * cv_splits}\n")
+    all_results = []
+    start_total = time.time()
 
-    # Run GridSearchCV with time series split
-    typer.echo(f"Running GridSearchCV with TimeSeriesSplit...")
-    start_time = time.time()
+    for idx, combo in enumerate(combinations, 1):
+        params = dict(zip(param_names, combo))
 
-    grid_search_cv = GridSearchCV(
-        estimator=base_model,
-        param_grid=param_grid,
-        cv=ts_cv,  # Time series split instead of random K-fold
-        scoring=rmspe_scorer,
-        n_jobs=n_jobs,
-        verbose=2,  # Verbose output to see progress
-    )
+        # Tạo config cho combo này — tắt early_stopping vì đang tune n_estimators trực tiếp
+        run_config = load_config(model_name)
+        run_config["model"]["early_stopping_rounds"] = 0
+        for k, v in params.items():
+            run_config["model"][k] = v
 
-    grid_search_cv.fit(X, y)
-    elapsed = time.time() - start_time
+        model = XGBoostModel(run_config)
+        start = time.time()
+        # train với val_df để early_stopping hoạt động (giống train.py)
+        model.train(train_df, val_df if len(val_df) > 0 else None)
+        preds = model.predict(test_df)
+        y_true = test_df["Sales"].values
+        metrics = evaluate_all(y_true, preds)
+        elapsed = time.time() - start
 
-    # Results
-    typer.echo(f"\n" + "=" * 80)
-    typer.echo(f"GridSearchCV completed in {elapsed:.1f}s ({elapsed/60:.1f} minutes)")
-    typer.echo(f"Best score (RMSPE): {-grid_search_cv.best_score_:.4f}")
-    typer.echo(f"Best parameters:\n{json.dumps(grid_search_cv.best_params_, indent=2)}")
-    typer.echo("=" * 80)
+        typer.echo(
+            f"[{idx}/{n_combos}] RMSPE={metrics['rmspe']:.4f} | "
+            f"lr={params['learning_rate']}, n_est={params['n_estimators']}, "
+            f"alpha={params['reg_alpha']}, lambda={params['reg_lambda']} | {elapsed:.0f}s"
+        )
 
-    # Save detailed results
+        all_results.append({
+            "params": params,
+            "rmspe": metrics["rmspe"],
+            "rmse": metrics["rmse"],
+            "mae": metrics["mae"],
+            "mape": metrics["mape"],
+            "elapsed": elapsed,
+        })
+
+    total_elapsed = time.time() - start_total
+
+    # Xếp hạng theo RMSPE
+    all_results.sort(key=lambda x: x["rmspe"])
+    for i, r in enumerate(all_results):
+        r["rank"] = i + 1
+
+    # Save results
     results_dir = (
         Path(config.get("results_dir", "results")) / "xgboost" / "grid_search_custom"
     )
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save best parameters
-    best_params_path = results_dir / "best_params.json"
-    with open(best_params_path, "w") as f:
-        json.dump(grid_search_cv.best_params_, f, indent=2)
-    typer.echo(f"Best parameters saved to {best_params_path}")
+    # Top 10
+    top_10 = all_results[:10]
+    typer.echo("\n" + "=" * 80)
+    typer.echo(f"Grid search completed in {total_elapsed:.0f}s ({total_elapsed/60:.1f} min)")
+    typer.echo(f"\nTop 10 (by RMSPE on test set):")
 
-    # Save CV results with run indexing
-    cv_results_df = pd.DataFrame(grid_search_cv.cv_results_)
+    top_10_rows = []
+    for r in top_10:
+        p = r["params"]
+        typer.echo(
+            f"  Rank {r['rank']}: RMSPE={r['rmspe']:.4f} | "
+            f"lr={p['learning_rate']}, n_est={p['n_estimators']}, "
+            f"alpha={p['reg_alpha']}, lambda={p['reg_lambda']}"
+        )
+        top_10_rows.append({
+            "rank_test_score": r["rank"],
+            "mean_test_score": round(r["rmspe"], 6),
+            "param_learning_rate": p["learning_rate"],
+            "param_n_estimators": p["n_estimators"],
+            "param_reg_alpha": p["reg_alpha"],
+            "param_reg_lambda": p["reg_lambda"],
+        })
 
-    # Add run index for each parameter combination
-    cv_results_df.insert(0, "run_index", range(1, len(cv_results_df) + 1))
+    pd.DataFrame(top_10_rows).to_csv(results_dir / "top_10_params.csv", index=False)
 
-    cv_results_path = results_dir / "cv_results.csv"
-    cv_results_df.to_csv(cv_results_path, index=False)
-    typer.echo(f"CV results saved to {cv_results_path}")
+    # Best params
+    best = all_results[0]
+    with open(results_dir / "best_params.json", "w") as f:
+        json.dump(best["params"], f, indent=2)
 
-    # Log each run with details
-    all_runs_log = []
-    for idx, row in cv_results_df.iterrows():
-        run_entry = {
-            "run_index": int(row["run_index"]),
-            "params": {
-                k.replace("param_", ""): row[k]
-                for k in row.index
-                if k.startswith("param_")
-            },
-            "mean_test_score": float(-row["mean_test_score"]),  # Convert back to RMSPE
-            "std_test_score": float(row["std_test_score"]),
-            "rank_test_score": int(row["rank_test_score"]),
-        }
-        all_runs_log.append(run_entry)
-
-    # Save all runs as JSON
-    all_runs_path = results_dir / "all_runs.json"
-    with open(all_runs_path, "w") as f:
+    # All runs
+    all_runs_log = [{
+        "rank": r["rank"],
+        "params": r["params"],
+        "rmspe": r["rmspe"],
+        "rmse": round(r["rmse"], 2),
+        "mae": round(r["mae"], 2),
+        "mape": round(r["mape"], 6),
+    } for r in all_results]
+    with open(results_dir / "all_runs.json", "w") as f:
         json.dump(all_runs_log, f, indent=2)
-    typer.echo(f"All runs log saved to {all_runs_path}")
-
-    # Display all runs with index in console
-    typer.echo(f"\nAll {len(all_runs_log)} runs (indexed):")
-    typer.echo("-" * 100)
-    for run in all_runs_log:
-        typer.echo(
-            f"[Run {run['run_index']}] RMSPE: {run['mean_test_score']:.4f} | Params: {run['params']}"
-        )
-    typer.echo("-" * 100)
-
-    # Top 10 results
-    top_10_idx = np.argsort(grid_search_cv.cv_results_["rank_test_score"])[:10]
-    top_10 = cv_results_df.iloc[top_10_idx][
-        [
-            "run_index",
-            "param_max_depth",
-            "param_learning_rate",
-            "param_n_estimators",
-            "param_subsample",
-            "param_colsample_bytree",
-            "mean_test_score",
-        ]
-    ].copy()
-    top_10["mean_test_score"] = -top_10["mean_test_score"]  # Convert back to RMSPE
-
-    typer.echo("\nTop 10 parameter combinations (by RMSPE):")
-    for idx, (_, row) in enumerate(top_10.iterrows(), 1):
-        typer.echo(
-            f"[Run {int(row['run_index'])}] Rank {idx}: RMSPE={row['mean_test_score']:.4f}"
-        )
-
-    top_10_path = results_dir / "top_10_params.csv"
-    top_10.to_csv(top_10_path, index=False)
-    typer.echo(f"Top 10 saved to {top_10_path}")
 
     # Summary
     summary = {
-        "total_combinations": len(grid_search_cv.cv_results_["params"]),
-        "best_rmspe": float(-grid_search_cv.best_score_),
-        "best_params": grid_search_cv.best_params_,
-        "cv_splits": cv_splits,
-        "training_time_seconds": elapsed,
-        "data_shape": {"n_samples": X.shape[0], "n_features": X.shape[1]},
+        "total_combinations": n_combos,
+        "best_rmspe": best["rmspe"],
+        "best_params": best["params"],
+        "training_time_seconds": total_elapsed,
+        "data_shape": {
+            "train_samples": len(train_df),
+            "test_samples": len(test_df),
+            "n_features": 18,
+        },
     }
-
-    summary_path = results_dir / "summary.json"
-    with open(summary_path, "w") as f:
+    with open(results_dir / "summary.json", "w") as f:
         json.dump(summary, f, indent=2)
-    typer.echo(f"Summary saved to {summary_path}")
+
+    typer.echo(f"\nResults saved to {results_dir}")
+    typer.echo(f"\nNext: chạy CV với best params:")
+    typer.echo(
+        f"  python scripts/evaluate.py --model xgboost --cv expanding --n-splits 5 --eval-days 30 "
+        f"--set model.learning_rate={best['params']['learning_rate']} "
+        f"--set model.n_estimators={best['params']['n_estimators']} "
+        f"--set model.reg_alpha={best['params']['reg_alpha']} "
+        f"--set model.reg_lambda={best['params']['reg_lambda']}"
+    )
 
 
 if __name__ == "__main__":

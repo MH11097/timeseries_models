@@ -44,34 +44,27 @@ def _filter_features(df: pd.DataFrame, feature_list: list[str]) -> list[str]:
 def _train_and_evaluate(
     model_name: str,
     train_df: pd.DataFrame,
-    val_df: pd.DataFrame,
+    test_df: pd.DataFrame,
     feature_cols: list[str],
     config: dict,
 ) -> dict:
-    """Train model with specific features and return metrics."""
-    # Select only required features
-    X_train = train_df[feature_cols].fillna(0)
-    y_train = train_df["Sales"].values
-
-    X_val = val_df[feature_cols].fillna(0)
-    y_val = val_df["Sales"].values
-
-    # Create and train model
+    """Train trên train_df, evaluate trên test_df riêng biệt (không data leakage)."""
     model_class = get_model_class(model_name)
     model = model_class(config)
 
-    # Temporarily override feature list in model
+    # Override feature list để chỉ dùng subset features đang test
     model._get_features = lambda df: df[feature_cols].fillna(0)
     model.feature_cols = feature_cols
 
-    # Train
+    # Train trên train_df only — không truyền val để tránh leakage
     start = time.time()
-    model.train(train_df, val_df)  # Still pass full dfs for compatibility
+    model.train(train_df)
     elapsed = time.time() - start
 
-    # Evaluate
-    predictions = model.predict(val_df)
-    metrics = evaluate_all(y_val, predictions)
+    # Evaluate trên test_df riêng biệt
+    predictions = model.predict(test_df)
+    y_true = test_df["Sales"].values
+    metrics = evaluate_all(y_true, predictions)
 
     return {
         "n_features": len(feature_cols),
@@ -98,8 +91,9 @@ def run(
     """Run ablation study starting from base features."""
     set_seed(seed)
 
-    # Load config
+    # Load config — tắt early_stopping vì không dùng val set
     config = load_config(model_name, {})
+    config["model"]["early_stopping_rounds"] = 0
     if max_stores is not None:
         config["max_stores"] = max_stores
 
@@ -117,16 +111,8 @@ def run(
     typer.echo("Preprocessing...")
     train_df, val_df, test_df, scaler = preprocess(df, config)
 
-    # val_df rỗng khi config không có val_start/val_end → dùng test_df thay thế
-    base_eval = val_df if len(val_df) > 0 else test_df
-
-    # Limit to specified number of days if eval_days is provided
-    if eval_days is not None:
-        eval_df = base_eval.head(eval_days)
-        typer.echo(f"Evaluating on first {eval_days} days ({len(eval_df)} samples)")
-    else:
-        eval_df = base_eval
-    typer.echo(f"Eval set: {'val' if len(val_df) > 0 else 'test'} ({len(eval_df)} rows)")
+    # Evaluate trên test_df — tách biệt hoàn toàn khỏi train
+    typer.echo(f"Train: {len(train_df):,} rows | Test: {len(test_df):,} rows")
 
     # Filter available features
     available_base = _filter_features(df, BASE_FEATURES)
@@ -146,7 +132,7 @@ def run(
 
     try:
         metrics = _train_and_evaluate(
-            model_name, train_df, eval_df, available_base, config
+            model_name, train_df, test_df, available_base, config
         )
         result = {
             "combination_id": 0,
@@ -180,7 +166,7 @@ def run(
 
         try:
             metrics = _train_and_evaluate(
-                model_name, train_df, eval_df, current_features, config
+                model_name, train_df, test_df, current_features, config
             )
             result = {
                 "combination_id": idx,
