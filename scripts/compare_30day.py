@@ -114,25 +114,26 @@ def save_table(df: pd.DataFrame):
 # 2. ERROR COMPARISON BAR CHART
 # ═══════════════════════════════════════════════════════════════════════════════
 def plot_error_comparison(df: pd.DataFrame):
-    """Bar chart so sánh MAE, RMSE, MAPE của 5 models."""
+    """Bar chart so sánh MAE, RMSE, MAPE, RMSPE của 5 models."""
     metrics = [
         ("_mae", "MAE", "Mean Absolute Error"),
         ("_rmse", "RMSE", "Root Mean Squared Error"),
         ("_mape", "MAPE (%)", "Mean Absolute Percentage Error"),
+        ("_rmspe", "RMSPE (%)", "Root Mean Squared Percentage Error"),
     ]
-    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    fig, axes = plt.subplots(1, 4, figsize=(24, 6))
 
     for ax, (col, label, title) in zip(axes, metrics):
         plot_df = df.set_index("Model").loc[MODEL_ORDER].reset_index()
         values = plot_df[col].values
-        if "mape" in col:
-            values = values * 100  # percent
+        if "pe" in col:
+            values = values * 100  # percent (MAPE & RMSPE)
         colors = [PALETTE[m] for m in plot_df["Model"]]
 
         bars = ax.bar(plot_df["Model"], values, color=colors, edgecolor="white", linewidth=0.8)
         # Giá trị trên mỗi cột
         for bar, v in zip(bars, values):
-            fmt = f"{v:.1f}%" if "mape" in col else f"{v:.0f}"
+            fmt = f"{v:.1f}%" if "pe" in col else f"{v:.0f}"
             ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + max(values) * 0.02,
                     fmt, ha="center", va="bottom", fontsize=9, fontweight="bold")
         ax.set_title(title, fontsize=13, fontweight="bold")
