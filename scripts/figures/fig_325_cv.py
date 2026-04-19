@@ -30,8 +30,8 @@ OUT_DIR = Path("results/figures")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # cấu hình tối ưu từ grid search Bước 4
-BEST_ORDER = [4, 0, 3]
-BEST_TREND = "ct"
+BEST_ORDER = [5, 1, 6]
+BEST_TREND = "n"
 N_SPLITS = 5
 EVAL_DAYS = 30
 

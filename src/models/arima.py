@@ -60,6 +60,14 @@ class ARIMAModel(BaseModel):
             "stores_failed": failed,
         }
 
+    def get_info_criteria(self) -> dict:
+        """Return mean AIC/BIC across all fitted store models."""
+        if not self.models:
+            return {"aic_mean": float("inf"), "bic_mean": float("inf"), "n_fitted": 0}
+        aic_vals = [m.aic for m in self.models.values()]
+        bic_vals = [m.bic for m in self.models.values()]
+        return {"aic_mean": np.mean(aic_vals), "bic_mean": np.mean(bic_vals), "n_fitted": len(aic_vals)}
+
     def predict(self, df: pd.DataFrame) -> np.ndarray:
         # mỗi store có model riêng → dự đoán từng nhóm store, ghép lại thành array đầy đủ
         # reset index vì sau split train/val/test, index gốc không liên tục → gán vào array positional sẽ out of bounds

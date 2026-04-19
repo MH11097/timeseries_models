@@ -78,9 +78,8 @@ print(f"Kết luận: p ∈ [0, 6], q ∈ [0, 6]")
 # ══════════════════════════════════════════════════════════════════════════════
 print("\nPlotting...")
 
-# chọn 6 store cách đều trong 30 store
-show_indices = np.linspace(0, len(stores) - 1, N_SHOW, dtype=int)
-show_stores = [stores[i] for i in show_indices]
+# 6 store đại diện — 197 & 203 có spike rõ nhất
+show_stores = [197, 203, 92, 150, 216, 287]
 
 fig, axes = plt.subplots(3, 4, figsize=(18, 12))
 fig.suptitle("ACF / PACF sau sai phân d=1 — 6 stores đại diện (type C)",

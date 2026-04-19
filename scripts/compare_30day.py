@@ -152,13 +152,17 @@ def plot_error_comparison(df: pd.DataFrame):
 # 3. LOAD MODELS + GENERATE 30-DAY PREDICTIONS
 # ═══════════════════════════════════════════════════════════════════════════════
 def _find_latest_run(model_name: str) -> Path | None:
-    """Tìm run directory mới nhất (theo tên thư mục chứa timestamp)."""
+    """Tìm run directory mới nhất (theo mtime — an toàn hơn so với sort theo tên
+    khi các run có prefix khác nhau, ví dụ order_3-... vs order_4-...)."""
     base = Path("results") / model_name
     if not base.exists():
         return None
-    # Bỏ qua cv/ và tuning/
-    runs = [d for d in sorted(base.iterdir()) if d.is_dir() and d.name not in ("cv", "tuning")]
-    return runs[-1] if runs else None
+    # Bỏ qua cv/ và tuning/ và grid_search*
+    runs = [d for d in base.iterdir()
+            if d.is_dir() and d.name not in ("cv", "tuning") and not d.name.startswith("grid_search")]
+    if not runs:
+        return None
+    return max(runs, key=lambda d: d.stat().st_mtime)
 
 
 def load_and_predict(model_name: str) -> tuple[np.ndarray, np.ndarray, pd.Series] | None:
