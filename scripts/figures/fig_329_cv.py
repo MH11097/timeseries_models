@@ -1,7 +1,8 @@
-"""Hình minh họa Section 3.2.2 — Cross-validation SARIMAX(4,0,4)(0,0,1,7).
+"""Hình minh họa Section 3.3.x — Cross-validation SARIMAX(3,0,3)(1,1,0,12) trend='n'.
 
-Walk-forward CV 5 folds, expanding window, 30 eval_days, exog=[Promo, SchoolHoliday].
-Kết quả mong đợi: RMSPE trung bình ≈ 0.2181 ± 0.0182.
+Walk-forward CV 5 folds, expanding window, 30 eval_days, exog=[Promo].
+Cấu hình tối ưu từ grid search 12 combos baseline + ablation 8 combos exog.
+Validation RMSPE = 0.1455.
 
 Output (results/figures/):
   329_cv_results_table.png  — Bảng per-fold: Fold | RMSPE | RMSE | MAE | MAPE | Time
@@ -28,11 +29,11 @@ from src.utils.seed import set_seed
 OUT_DIR = Path("results/figures")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# cấu hình tối ưu từ grid search + ablation
-BEST_ORDER = [4, 0, 4]
-BEST_SEASONAL = [0, 0, 1, 7]
+# cấu hình tối ưu từ grid search 12 combos + ablation 8 combos
+BEST_ORDER = [3, 0, 3]
+BEST_SEASONAL = [1, 1, 0, 12]
 BEST_TREND = "n"
-BEST_EXOG = ["Promo", "SchoolHoliday"]
+BEST_EXOG = ["Promo"]
 N_SPLITS = 5
 EVAL_DAYS = 30
 
